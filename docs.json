@@ -83,7 +83,8 @@
               "api/academic",
               "api/resources",
               "api/bookmarks",
-              "api/analytics"
+              "api/analytics",
+              "api/students"
             ]
           },
           {

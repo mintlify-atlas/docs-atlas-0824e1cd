@@ -1,0 +1,356 @@
+---
+title: 'Student Management API'
+description: 'Server actions for registering, updating, and managing student accounts with admin privileges'
+icon: 'users'
+---
+
+## Overview
+
+The Student Management API provides administrative functions for managing student accounts in the DIDG System. These actions use the Supabase Admin Client (service role key) to bypass Row Level Security and directly manipulate user authentication and profile data.
+
+<Warning>
+  All functions in this module require admin authentication and use the service role key. They bypass RLS policies and should only be called from protected admin routes.
+</Warning>
+
+**Source**: `src/core/actions/students.ts`
+
+---
+
+## registerStudent
+
+Creates a new student account with authentication credentials and sends a Telegram notification to the admin.
+
+```typescript
+export async function registerStudent(
+  prevState: any,
+  formData: FormData
+): Promise<{ success: boolean; message: string }>
+```
+
+### Parameters
+
+<ParamField body="formData" type="FormData" required>
+  Form data containing student registration information:
+  - `email` (string) - Student's email address (used for login)
+  - `full_name` (string) - Student's full name
+  - `rut` (string) - Chilean national ID (also used as initial password)
+</ParamField>
+
+<ParamField body="prevState" type="any">
+  Previous form state (for React Server Actions with `useFormState`)
+</ParamField>
+
+### Return Values
+
+<ResponseField name="success" type="boolean">
+  `true` if registration succeeded, `false` if error occurred
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success or error message to display to the user
+</ResponseField>
+
+### Behavior
+
+1. **Admin Client**: Uses service role key to bypass RLS
+2. **User Creation**: Creates auth user with `email_confirm: true` (auto-verified)
+3. **Password**: Sets password to the student's RUT (they should change it later)
+4. **User Metadata**: Stores `full_name`, `rut`, and `role: "student"` in metadata
+5. **Profile Trigger**: Database trigger automatically creates profile entry
+6. **Telegram Notification**: Sends formatted registration notification to admin
+7. **Path Revalidation**: Refreshes `/dashboard/students` cache
+
+### Error Handling
+
+- **Email exists**: Returns custom message if email is already registered
+- **Generic errors**: Returns error message from Supabase
+
+### Database Integration
+
+The registration triggers automatic profile creation via database trigger:
+
+```sql
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, rut, role, email)
+  VALUES (
+    NEW.id,
+    NEW.raw_user_meta_data->>'full_name',
+    NEW.raw_user_meta_data->>'rut',
+    COALESCE(NEW.raw_user_meta_data->>'role', 'student'),
+    NEW.email
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+### Usage Example
+
+```typescript
+// In StudentRegisterForm component
+import { registerStudent } from '@/core/actions/students';
+import { useFormState } from 'react-dom';
+
+function StudentRegisterForm() {
+  const [state, formAction] = useFormState(registerStudent, { 
+    success: false, 
+    message: '' 
+  });
+
+  return (
+    <form action={formAction}>
+      <input name="email" type="email" required />
+      <input name="full_name" type="text" required />
+      <input name="rut" type="text" required />
+      <button type="submit">Registrar Estudiante</button>
+      {state.message && <p>{state.message}</p>}
+    </form>
+  );
+}
+```
+
+### Telegram Notification
+
+Sends a formatted notification to the admin's Telegram bot:
+
+```
+🎉 NUEVA MATRÍCULA REGISTRADA
+──────────────────
+
+👤 Información del Estudiante:
+├ Nombre: Juan Pérez García
+├ RUT: 12.345.678-9
+└ Email: juan.perez@estudiante.cl
+
+──────────────────
+📅 Fecha: 04/03/2026 14:30
+#NewStudent #DIDG_System
+```
+
+---
+
+## updateStudent
+
+Updates an existing student's authentication credentials and profile information.
+
+```typescript
+export async function updateStudent(
+  id: string,
+  data: {
+    full_name: string;
+    rut: string;
+    email: string;
+    password?: string;
+  }
+): Promise<{ success?: boolean; error?: string }>
+```
+
+### Parameters
+
+<ParamField path="id" type="string" required>
+  UUID of the student user to update
+</ParamField>
+
+<ParamField body="data.full_name" type="string" required>
+  Updated full name
+</ParamField>
+
+<ParamField body="data.rut" type="string" required>
+  Updated Chilean national ID
+</ParamField>
+
+<ParamField body="data.email" type="string" required>
+  Updated email address (must be unique)
+</ParamField>
+
+<ParamField body="data.password" type="string">
+  New password (optional - only include if changing password)
+</ParamField>
+
+### Return Values
+
+<ResponseField name="success" type="boolean">
+  `true` if update succeeded (only present on success)
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message if update failed (only present on failure)
+</ResponseField>
+
+### Behavior
+
+1. **Auth Update**: Updates email, password (if provided), and user metadata
+2. **Auto-Confirm**: Sets `email_confirm: true` for new email
+3. **Profile Update**: Syncs changes to `profiles` table
+4. **Path Revalidation**: Refreshes `/dashboard/students` cache
+
+### Error Handling
+
+- **Email in use**: Returns custom message if email already exists
+- **Auth errors**: Returns descriptive error message
+- **Partial success**: If auth succeeds but profile fails, returns warning message
+
+### Usage Example
+
+```typescript
+// In StudentsTable component
+async function handleUpdate(studentId: string, formData: FormData) {
+  const result = await updateStudent(studentId, {
+    full_name: formData.get('full_name') as string,
+    rut: formData.get('rut') as string,
+    email: formData.get('email') as string,
+    password: formData.get('password') as string || undefined
+  });
+
+  if (result.error) {
+    toast.error(result.error);
+  } else {
+    toast.success('Estudiante actualizado correctamente');
+  }
+}
+```
+
+### Security Notes
+
+<Note>
+  - Email updates are auto-confirmed (no verification email sent)
+  - Password is optional - only update if user wants to change it
+  - Empty password strings are ignored (won't reset password)
+</Note>
+
+---
+
+## deleteStudent
+
+Permanently deletes a student account from the authentication system and cascades to related records.
+
+```typescript
+export async function deleteStudent(
+  id: string
+): Promise<{ success?: boolean; error?: string }>
+```
+
+### Parameters
+
+<ParamField path="id" type="string" required>
+  UUID of the student user to delete
+</ParamField>
+
+### Return Values
+
+<ResponseField name="success" type="boolean">
+  `true` if deletion succeeded (only present on success)
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message if deletion failed (only present on failure)
+</ResponseField>
+
+### Behavior
+
+1. **Auth Deletion**: Removes user from Supabase Auth system
+2. **Cascade Deletion**: Database triggers handle cleanup via `ON DELETE CASCADE`:
+   - Profile entry deleted
+   - Grade records deleted
+   - Enrollment records deleted
+   - Bookmark records deleted
+3. **Path Revalidation**: Refreshes `/dashboard/students` cache
+
+<Warning>
+  This action is irreversible. All student data including grades, enrollments, and bookmarks will be permanently deleted.
+</Warning>
+
+### Database CASCADE Configuration
+
+```sql
+-- Profiles cascade
+ALTER TABLE profiles
+  ADD CONSTRAINT profiles_id_fkey
+  FOREIGN KEY (id) REFERENCES auth.users(id)
+  ON DELETE CASCADE;
+
+-- Grades cascade
+ALTER TABLE grades
+  ADD CONSTRAINT grades_student_id_fkey
+  FOREIGN KEY (student_id) REFERENCES profiles(id)
+  ON DELETE CASCADE;
+
+-- Enrollments cascade
+ALTER TABLE enrollments
+  ADD CONSTRAINT enrollments_student_id_fkey
+  FOREIGN KEY (student_id) REFERENCES profiles(id)
+  ON DELETE CASCADE;
+```
+
+### Usage Example
+
+```typescript
+// In StudentsTable component with confirmation dialog
+async function handleDelete(studentId: string, studentName: string) {
+  const confirmed = confirm(
+    `¿Estás seguro de eliminar a ${studentName}? Esta acción no se puede deshacer.`
+  );
+  
+  if (!confirmed) return;
+
+  const result = await deleteStudent(studentId);
+
+  if (result.error) {
+    toast.error('Error al eliminar: ' + result.error);
+  } else {
+    toast.success('Estudiante eliminado correctamente');
+  }
+}
+```
+
+### Admin UI Integration
+
+**Component**: `src/components/dashboard/StudentsTable.tsx`
+
+The delete action is typically integrated with:
+- Confirmation dialog (using `window.confirm` or custom modal)
+- Optimistic UI updates (remove from table immediately)
+- Error handling with toast notifications
+- Automatic table refresh via `revalidatePath`
+
+---
+
+## Admin Client Pattern
+
+All functions in this module use the admin client to bypass RLS:
+
+```typescript
+const getAdminClient = () => {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+};
+```
+
+<Warning>
+  The service role key (`SUPABASE_SERVICE_ROLE_KEY`) bypasses all RLS policies and should never be exposed to the client. These functions must only be called from server actions or API routes protected by admin authentication.
+</Warning>
+
+### Security Checklist
+
+- ✅ Functions only called from admin-protected routes
+- ✅ Service role key stored in environment variables (never in client code)
+- ✅ Dashboard layout checks admin role before rendering
+- ✅ Middleware protects `/dashboard/*` routes
+- ✅ User confirmation required for destructive actions (delete)
+
+### Related Documentation
+
+- [Authentication & 2FA](/features/authentication) - Admin login with Telegram 2FA
+- [Admin Guide](/guides/admin-guide) - Complete admin dashboard walkthrough
+- [Security Architecture](/architecture/security) - RLS policies and role-based access
+- [Database Schema](/architecture/database-schema) - Tables and relationships

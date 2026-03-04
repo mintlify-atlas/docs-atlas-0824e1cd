@@ -538,3 +538,188 @@ export async function getUserDownloadHistory() {
   return data || [];
 }
 ```
+
+---
+
+## submitFeedback
+
+Allows users to submit feedback (feature requests or bug reports) which are stored in the database and sent to the admin via Telegram.
+
+**Source**: `src/core/actions/feedback.ts:13`
+
+```typescript
+export async function submitFeedback({
+  type,
+  message,
+  resourceTitle,
+  subjectName
+}: FeedbackInput): Promise<{ ok: boolean; error?: string }>
+
+interface FeedbackInput {
+  type: 'request' | 'report';
+  message: string;
+  resourceTitle?: string;
+  subjectName?: string;
+}
+```
+
+### Parameters
+
+<ParamField body="type" type="'request' | 'report'" required>
+  Type of feedback: `'request'` for feature requests, `'report'` for bug reports
+</ParamField>
+
+<ParamField body="message" type="string" required>
+  The feedback message content from the user
+</ParamField>
+
+<ParamField body="resourceTitle" type="string">
+  Optional. The title of the resource being reported (for bug reports)
+</ParamField>
+
+<ParamField body="subjectName" type="string">
+  Optional. The name of the subject/course context
+</ParamField>
+
+### Return Values
+
+<ResponseField name="ok" type="boolean">
+  `true` if feedback was submitted successfully, `false` otherwise
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message if submission failed (only present when `ok` is `false`)
+</ResponseField>
+
+### Behavior
+
+1. **Database Insert**: Saves feedback to the `feedback` table with type and message
+2. **Telegram Notification**: Sends formatted notification to admin with context
+3. **Async Notification**: Telegram send is non-blocking (fire-and-forget)
+
+### Database Schema
+
+```sql
+CREATE TABLE feedback (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  type TEXT NOT NULL CHECK (type IN ('request', 'report')),
+  message TEXT NOT NULL,
+  resource_title TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+### Usage Example
+
+```typescript
+// Bug report from student
+const result = await submitFeedback({
+  type: 'report',
+  message: 'El PDF de la ayudantía 3 no se puede descargar',
+  resourceTitle: 'Ayudantía 3 - Estructuras de Datos',
+  subjectName: 'Algoritmos y Programación'
+});
+
+if (result.ok) {
+  toast.success('Reporte enviado correctamente');
+}
+
+// Feature request
+const result = await submitFeedback({
+  type: 'request',
+  message: 'Sería útil tener un buscador de recursos por palabra clave'
+});
+```
+
+### Telegram Message Format
+
+**Bug Report**:
+```
+🚨 REPORTE DE INCIDENCIA
+──────────────────
+
+📂 Contexto:
+├ 📚 Asignatura: Algoritmos y Programación
+└ 📄 Recurso: Ayudantía 3 - Estructuras de Datos
+
+💬 Mensaje del Usuario:
+"El PDF de la ayudantía 3 no se puede descargar"
+
+──────────────────
+🔴 Fecha: 04/03/2026 10:30
+#DIDG_System #BugReport
+```
+
+**Feature Request**:
+```
+💡 SOLICITUD DE CONTENIDO
+──────────────────
+
+💬 Mensaje del Usuario:
+"Sería útil tener un buscador de recursos por palabra clave"
+
+──────────────────
+🔵 Fecha: 04/03/2026 10:32
+#DIDG_System #FeatureRequest
+```
+
+---
+
+## markMessageAsRead
+
+Marks a contact message as read in the admin dashboard message inbox.
+
+**Source**: `src/core/actions/messages.ts:9`
+
+```typescript
+export async function markMessageAsRead(id: string): Promise<void>
+```
+
+### Parameters
+
+<ParamField body="id" type="string" required>
+  UUID of the message to mark as read
+</ParamField>
+
+### Behavior
+
+- Updates the `messages.is_read` field to `true`
+- Revalidates the `/dashboard/messages` path
+- Throws an error if update fails
+
+### Database Schema
+
+```sql
+CREATE TABLE messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  message TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+### Usage Example
+
+```typescript
+// In MessageActions component
+async function handleMarkAsRead(messageId: string) {
+  try {
+    await markMessageAsRead(messageId);
+    toast.success('Mensaje marcado como leído');
+  } catch (error) {
+    toast.error('Error al actualizar el mensaje');
+  }
+}
+```
+
+### Admin Dashboard Integration
+
+This action is used in the `/dashboard/messages` page where admins can:
+- View all contact form submissions
+- Mark messages as read/unread
+- Filter by read status
+- Sort by date
+
+**Component**: `src/components/dashboard/MessageActions.tsx`
