@@ -1,97 +1,288 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: DIDG System Documentation
+mode: custom
 ---
 
-## Setting up
+<div className="relative min-h-[600px] flex items-center justify-center overflow-hidden bg-[#121212] dark:bg-[#0a0a0a] py-20">
+  {/* Background glow effects */}
+  <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#00f0ff]/20 rounded-full blur-[120px]" />
+  <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#00e5ff]/10 rounded-full blur-[100px]" />
+  
+  <div className="relative z-10 max-w-6xl mx-auto px-6 text-center">
+    {/* Badge */}
+    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#00f0ff]/30 bg-[#00f0ff]/10 backdrop-blur-sm mb-6">
+      <span className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00f0ff] opacity-75" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00f0ff]" />
+      </span>
+      <span className="text-xs font-bold text-[#00f0ff] tracking-wider uppercase font-[Orbitron]">Academic Management Platform</span>
+    </div>
 
-Get your documentation site up and running in minutes.
+    {/* Heading */}
+    <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white dark:text-gray-100 mb-6 font-[Orbitron] leading-tight">
+      Welcome to <br />
+      <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#00f0ff] via-[#00e5ff] to-[#00d4ea]">
+        DIDG System
+      </span>
+    </h1>
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+    {/* Subtitle */}
+    <p className="text-lg sm:text-xl text-[#d0d8e8] dark:text-gray-400 max-w-3xl mx-auto mb-10 leading-relaxed">
+      A comprehensive academic management platform for engineering students featuring teaching assistant resources, grade tracking, interactive tools, and secure authentication with Telegram 2FA.
+    </p>
 
-## Make it yours
+    {/* CTA Buttons */}
+    <div className="flex flex-wrap items-center justify-center gap-4">
+      <a 
+        href="/quickstart" 
+        className="group px-8 py-4 bg-[#00e5ff] hover:bg-[#00f0ff] text-[#000000] font-bold text-base rounded-md transition-all duration-300 flex items-center gap-2 no-underline shadow-[0_0_20px_rgba(0,229,255,0.3)] hover:shadow-[0_0_30px_rgba(0,240,255,0.5)]"
+      >
+        Get Started
+        <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
+      </a>
+      
+      <a 
+        href="/architecture/overview" 
+        className="px-8 py-4 bg-transparent border-2 border-[#d9dce3]/30 hover:border-[#00f0ff] text-[#d9dce3] hover:text-[#00f0ff] font-bold text-base rounded-md transition-all duration-300 no-underline"
+      >
+        View Architecture
+      </a>
+    </div>
 
-Design a docs site that looks great and empowers your users.
+    {/* Tech Stack Pills */}
+    <div className="mt-16 flex flex-wrap items-center justify-center gap-4 text-sm text-[#d0d8e8] dark:text-gray-400">
+      <div className="px-4 py-2 bg-[#121212] dark:bg-[#1a1d27] border border-[#00f0ff]/20 rounded-full hover:border-[#00f0ff]/50 transition-colors">
+        Next.js 14
+      </div>
+      <div className="px-4 py-2 bg-[#121212] dark:bg-[#1a1d27] border border-[#00f0ff]/20 rounded-full hover:border-[#00f0ff]/50 transition-colors">
+        TypeScript
+      </div>
+      <div className="px-4 py-2 bg-[#121212] dark:bg-[#1a1d27] border border-[#00f0ff]/20 rounded-full hover:border-[#00f0ff]/50 transition-colors">
+        Supabase
+      </div>
+      <div className="px-4 py-2 bg-[#121212] dark:bg-[#1a1d27] border border-[#00f0ff]/20 rounded-full hover:border-[#00f0ff]/50 transition-colors">
+        Tailwind CSS
+      </div>
+    </div>
+  </div>
+</div>
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+{/* Quick Start Section */}
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 font-[Orbitron]">Quick Start</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Get up and running with DIDG System in just a few steps.
+  </p>
 
-## Create beautiful pages
+  <Steps>
+    <Step title="Clone the repository">
+      Clone the DIDG System repository to your local machine:
+      
+      ```bash
+      git clone https://github.com/Charmandiox9/DIDG_Website.git
+      cd DIDG_Website/didg-website
+      ```
+    </Step>
+    
+    <Step title="Install dependencies">
+      Install the required npm packages:
+      
+      ```bash
+      npm install
+      ```
+    </Step>
+    
+    <Step title="Configure environment">
+      Create a `.env.local` file with your Supabase credentials and Telegram bot token:
+      
+      ```env
+      NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+      NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+      TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+      TELEGRAM_CHAT_ID=your_telegram_chat_id
+      ```
+      
+      <Info>See the [Configuration](/development/configuration) page for detailed setup instructions.</Info>
+    </Step>
+    
+    <Step title="Run the development server">
+      Start the Next.js development server:
+      
+      ```bash
+      npm run dev
+      ```
+      
+      Your application will be available at `http://localhost:3000`.
+    </Step>
+  </Steps>
+</div>
 
-Everything you need to create world-class documentation.
+{/* Explore Features Section */}
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 font-[Orbitron]">Explore by Topic</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Discover the powerful features that make DIDG System the ideal platform for academic management.
+  </p>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+  <CardGroup cols={2}>
+    <Card 
+      title="Authentication & Security" 
+      icon="shield-halved" 
+      href="/features/authentication"
+    >
+      Supabase Auth with 2FA via Telegram for secure admin access and role-based permissions.
+    </Card>
+    
+    <Card 
+      title="Academic Management" 
+      icon="graduation-cap" 
+      href="/features/academic-management"
+    >
+      Teaching assistant timeline, session management, and course organization tools.
+    </Card>
+    
+    <Card 
+      title="Resource Library" 
+      icon="book-open" 
+      href="/features/resource-library"
+    >
+      Comprehensive resource management with filtering, tagging, and student bookmarks.
+    </Card>
+    
+    <Card 
+      title="Interactive Tools" 
+      icon="calculator" 
+      href="/features/tools"
+    >
+      Grade simulator, command palette (Ctrl+K), and student productivity utilities.
+    </Card>
+  </CardGroup>
+</div>
 
-## Need inspiration?
+{/* User Guides Section */}
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 font-[Orbitron]">User Guides</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Step-by-step guides for students and administrators.
+  </p>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+  <CardGroup cols={2}>
+    <Card 
+      title="Student Guide" 
+      icon="user" 
+      href="/guides/student-guide"
+    >
+      Learn how to access resources, bookmark content, and track your academic progress.
+    </Card>
+    
+    <Card 
+      title="Admin Guide" 
+      icon="user-shield" 
+      href="/guides/admin-guide"
+    >
+      Manage courses, upload resources, track analytics, and configure system settings.
+    </Card>
+    
+    <Card 
+      title="Course Management" 
+      icon="chalkboard" 
+      href="/guides/course-management"
+    >
+      Create teaching assistant sessions, organize materials, and manage student access.
+    </Card>
+    
+    <Card 
+      title="Resource Management" 
+      icon="folder-tree" 
+      href="/guides/resource-management"
+    >
+      Upload, categorize, and maintain academic resources for your courses.
+    </Card>
+  </CardGroup>
+</div>
+
+{/* Developer Resources Section */}
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 font-[Orbitron]">Developer Resources</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Technical documentation for developers extending or deploying DIDG System.
+  </p>
+
+  <CardGroup cols={3}>
+    <Card 
+      title="Environment Setup" 
+      icon="wrench" 
+      href="/development/environment-setup"
+    >
+      Configure your development environment with all required tools and dependencies.
+    </Card>
+    
+    <Card 
+      title="Server Actions API" 
+      icon="code" 
+      href="/api/authentication"
+    >
+      Explore Next.js server actions for authentication, resources, and analytics.
+    </Card>
+    
+    <Card 
+      title="Component Library" 
+      icon="puzzle-piece" 
+      href="/components/dashboard"
+    >
+      Browse reusable React components for dashboard, courses, and UI elements.
+    </Card>
+    
+    <Card 
+      title="Architecture Overview" 
+      icon="sitemap" 
+      href="/architecture/overview"
+    >
+      Understand the system architecture and design principles behind DIDG.
+    </Card>
+    
+    <Card 
+      title="Database Schema" 
+      icon="database" 
+      href="/architecture/database-schema"
+    >
+      Review the Supabase database schema and Row Level Security policies.
+    </Card>
+    
+    <Card 
+      title="Deployment Guide" 
+      icon="rocket" 
+      href="/deployment/overview"
+    >
+      Deploy DIDG System to production with Vercel and Supabase.
+    </Card>
+  </CardGroup>
+</div>
+
+{/* Closing CTA Banner */}
+<div className="mt-20 mb-16 max-w-5xl mx-auto px-6">
+  <div className="relative overflow-hidden bg-[#121212] dark:bg-[#1a1d27] border-2 border-[#00f0ff]/30 rounded-2xl p-10 text-center shadow-[0_0_24px_rgba(0,240,255,0.2)]">
+    {/* Background glow */}
+    <div className="absolute inset-0 bg-gradient-to-br from-[#00f0ff]/10 to-transparent" />
+    
+    <div className="relative z-10">
+      <h2 className="text-3xl sm:text-4xl font-bold text-white dark:text-gray-100 mb-4 font-[Orbitron]">
+        Ready to get started?
+      </h2>
+      <p className="text-lg text-[#d0d8e8] dark:text-gray-400 mb-8 max-w-2xl mx-auto">
+        Follow our quickstart guide to have DIDG System up and running in minutes.
+      </p>
+      <a 
+        href="/quickstart" 
+        className="inline-flex items-center gap-2 px-8 py-4 bg-[#00e5ff] hover:bg-[#00f0ff] text-[#000000] font-bold text-base rounded-md transition-all duration-300 no-underline shadow-[0_0_20px_rgba(0,229,255,0.3)] hover:shadow-[0_0_30px_rgba(0,240,255,0.5)]"
+      >
+        Start Building
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
+      </a>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,458 @@
+---
+title: Environment Variables
+description: Complete reference of all environment variables used in the DIDG System
+---
+
+## Overview
+
+The DIDG System requires several environment variables for proper operation. This page documents every environment variable used in the application, where to obtain the values, and which services require them.
+
+<Warning>
+**Security**: Never commit `.env` files to version control. Use Vercel's encrypted environment variable storage for production.
+</Warning>
+
+## Required Variables
+
+These variables are essential for the application to function.
+
+### Supabase Configuration
+
+#### NEXT_PUBLIC_SUPABASE_URL
+
+**Purpose**: Supabase project URL for client and server connections.
+
+**Where to get it**: 
+1. Go to [Supabase Dashboard](https://app.supabase.com)
+2. Select your project
+3. Navigate to **Settings** > **API**
+4. Copy **Project URL**
+
+**Example value**:
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://abcdefghijklmnop.supabase.co
+```
+
+**Required**: Yes
+
+**Used in**:
+- `src/infrastructure/supabase/server.ts:10` - Server-side client
+- `src/infrastructure/supabase/client.ts:6` - Browser client
+- `src/infrastructure/supabase/admin.ts:7` - Admin client
+- `src/core/actions/students.ts:11` - Student management
+- `src/core/actions/grades-upload.ts:12` - Grade uploads
+- `src/components/resources/ResourceCard.tsx:46` - Storage URLs
+- `src/components/courses/AyudantiaList.tsx:87` - Material URLs
+
+**Scope**: Client and Server (public)
+
+<Note>
+This variable is prefixed with `NEXT_PUBLIC_` which means it's exposed to the browser. It's safe to expose as it's just the API endpoint URL.
+</Note>
+
+---
+
+#### NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+**Purpose**: Supabase anonymous (public) API key for client-side authentication and queries.
+
+**Where to get it**:
+1. Go to [Supabase Dashboard](https://app.supabase.com)
+2. Select your project
+3. Navigate to **Settings** > **API**
+4. Copy **anon public** key
+
+**Example value**:
+```bash
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWprbG1ub3AiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTYyMzg4NjQwMCwiZXhwIjoxOTM5NDYyNDAwfQ.example-signature-here
+```
+
+**Required**: Yes
+
+**Used in**:
+- `src/infrastructure/supabase/server.ts:11` - Server-side client
+- `src/infrastructure/supabase/client.ts:7` - Browser client
+
+**Scope**: Client and Server (public)
+
+**Security**: 
+- This key respects Row Level Security (RLS) policies
+- Safe to expose to the browser
+- Cannot bypass RLS restrictions
+
+---
+
+#### SUPABASE_SERVICE_ROLE_KEY
+
+**Purpose**: Supabase service role key for admin operations that bypass Row Level Security.
+
+**Where to get it**:
+1. Go to [Supabase Dashboard](https://app.supabase.com)
+2. Select your project
+3. Navigate to **Settings** > **API**
+4. Copy **service_role secret** key (click to reveal)
+
+**Example value**:
+```bash
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWprbG1ub3AiLCJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNjIzODg2NDAwLCJleHAiOjE5Mzk0NjI0MDB9.example-signature-here
+```
+
+**Required**: Yes
+
+**Used in**:
+- `src/infrastructure/supabase/admin.ts:8` - Admin client
+- `src/core/actions/students.ts:12` - Student management
+- `src/core/actions/grades-upload.ts:13` - Grade uploads
+
+**Scope**: Server-only (secret)
+
+<Warning>
+**CRITICAL SECURITY WARNING**:
+- This key bypasses ALL Row Level Security policies
+- NEVER expose this in client-side code
+- NEVER commit to version control
+- Only use in Server Actions and API Routes
+- Treat this like a database root password
+</Warning>
+
+**Use cases**:
+- Creating enrollments during grade upload
+- Managing verification codes for 2FA
+- Admin operations that need to bypass RLS
+- Bulk data operations
+
+---
+
+### Telegram Integration
+
+#### TELEGRAM_BOT_TOKEN
+
+**Purpose**: Telegram Bot API token for sending notifications to admins.
+
+**Where to get it**:
+1. Open Telegram and search for [@BotFather](https://t.me/botfather)
+2. Send `/newbot` command
+3. Follow prompts to create your bot
+4. Copy the API token provided
+
+**Example value**:
+```bash
+TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789
+```
+
+**Required**: No (optional feature)
+
+**Used in**:
+- `src/core/lib/telegram.ts:3` - Telegram client initialization
+
+**Scope**: Server-only (secret)
+
+**Features enabled**:
+- Grade submission notifications
+- Admin alerts
+- System notifications
+
+**Fallback behavior**:
+If not configured, the system logs a warning and continues without Telegram notifications:
+```typescript
+if (!BOT_TOKEN || !CHAT_ID) {
+  console.warn("⚠️ Telegram no configurado (Faltan variables de entorno).");
+  return;
+}
+```
+
+---
+
+#### TELEGRAM_CHAT_ID
+
+**Purpose**: Telegram chat ID where notifications should be sent (typically admin's personal chat ID).
+
+**Where to get it**:
+1. Add your bot to a chat or message it directly
+2. Send any message to the bot
+3. Visit: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+4. Look for `"chat":{"id":123456789}` in the response
+5. Copy the numeric ID
+
+Or use [@userinfobot](https://t.me/userinfobot):
+1. Start chat with @userinfobot
+2. Send any message
+3. Bot replies with your user ID
+
+**Example value**:
+```bash
+TELEGRAM_CHAT_ID=123456789
+```
+
+**Required**: No (required only if `TELEGRAM_BOT_TOKEN` is set)
+
+**Used in**:
+- `src/core/lib/telegram.ts:4` - Default recipient for notifications
+
+**Scope**: Server-only
+
+**Notes**:
+- Can be a personal chat ID or group chat ID
+- Negative IDs indicate group chats (e.g., `-1001234567890`)
+- Bot must be added to the chat if using a group
+
+---
+
+### Application Configuration
+
+#### NEXT_PUBLIC_SITE_URL
+
+**Purpose**: Base URL of the deployed application for metadata, redirects, and absolute URLs.
+
+**Where to get it**:
+- Use your custom domain if configured
+- Or use Vercel's auto-generated URL: `https://your-project.vercel.app`
+
+**Example values**:
+```bash
+# Production
+NEXT_PUBLIC_SITE_URL=https://didg.danielduran.engineer
+
+# Development
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+# Vercel auto-generated
+NEXT_PUBLIC_SITE_URL=https://didg-website.vercel.app
+```
+
+**Required**: No (has fallback)
+
+**Used in**:
+- `src/app/layout.tsx:21` - OpenGraph metadata base URL
+
+**Scope**: Client and Server (public)
+
+**Fallback**:
+```typescript
+metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://www.danielduran.engineer')
+```
+
+**Impact**:
+- SEO metadata (OpenGraph, Twitter Cards)
+- Email links and redirects
+- Sitemap generation
+- Canonical URLs
+
+---
+
+## Environment-Specific Configuration
+
+### Local Development (.env.local)
+
+Create a `.env.local` file in the project root:
+
+```bash
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=https://your-dev-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-dev-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-dev-service-role-key
+
+# Application Configuration
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+# Telegram Integration (Optional)
+TELEGRAM_BOT_TOKEN=your-bot-token
+TELEGRAM_CHAT_ID=your-chat-id
+```
+
+<Note>
+**Development Setup**: It's recommended to use a separate Supabase project for development to avoid affecting production data.
+</Note>
+
+---
+
+### Production (Vercel)
+
+Configure in Vercel Dashboard:
+
+1. Go to **Project Settings** > **Environment Variables**
+2. Add each variable
+3. Select environments: **Production**, **Preview**, **Development**
+4. Mark sensitive variables as "Sensitive" (hides value in UI)
+
+**Production Configuration**:
+
+| Variable | Environment | Sensitive | Value Source |
+|----------|-------------|-----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | All | No | Production Supabase project |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | All | No | Production Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | All | **Yes** | Production service role key |
+| `TELEGRAM_BOT_TOKEN` | Production | **Yes** | Production bot token |
+| `TELEGRAM_CHAT_ID` | Production | No | Production chat ID |
+| `NEXT_PUBLIC_SITE_URL` | Production | No | Your production domain |
+
+**Preview Configuration** (for PR deployments):
+- Use same production values OR
+- Use separate staging Supabase project
+
+---
+
+### CI/CD (GitHub Actions)
+
+If using GitHub Actions for testing:
+
+```yaml
+env:
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+```
+
+Store as **GitHub Secrets**:
+1. Repository > **Settings** > **Secrets and variables** > **Actions**
+2. Click **New repository secret**
+3. Add each variable
+
+---
+
+## Validation and Testing
+
+### Test Environment Variables
+
+Create a test endpoint to validate configuration:
+
+```typescript
+// app/api/config-check/route.ts (development only)
+import { createClient } from '@/infrastructure/supabase/server'
+
+export async function GET() {
+  if (process.env.NODE_ENV === 'production') {
+    return Response.json({ error: 'Not available in production' }, { status: 403 })
+  }
+
+  const checks = {
+    supabase_url: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+    supabase_anon_key: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    supabase_service_key: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    telegram_bot: !!process.env.TELEGRAM_BOT_TOKEN,
+    telegram_chat: !!process.env.TELEGRAM_CHAT_ID,
+    site_url: process.env.NEXT_PUBLIC_SITE_URL,
+  }
+
+  // Test Supabase connection
+  try {
+    const supabase = await createClient()
+    const { error } = await supabase.from('profiles').select('count').limit(1)
+    checks.supabase_connection = !error
+  } catch {
+    checks.supabase_connection = false
+  }
+
+  return Response.json(checks)
+}
+```
+
+Visit `/api/config-check` in development to verify setup.
+
+---
+
+### Common Issues
+
+#### Missing Environment Variables
+
+**Error**:
+```
+Error: Invalid Supabase URL
+```
+
+**Solution**: Ensure `NEXT_PUBLIC_SUPABASE_URL` is set correctly.
+
+---
+
+#### Service Role Key Exposed Client-Side
+
+**Error** (runtime warning):
+```
+Warning: Service role key detected in client bundle
+```
+
+**Solution**: 
+- Never use `NEXT_PUBLIC_` prefix for service role key
+- Only import admin client in server-side code (Server Actions, API Routes)
+- Check imports in Client Components
+
+---
+
+#### Telegram Not Working
+
+**Symptom**: No notifications received
+
+**Debug**:
+1. Check bot token is valid: `https://api.telegram.org/bot<TOKEN>/getMe`
+2. Verify chat ID is correct
+3. Ensure bot has access to chat (add bot to group if using group chat)
+4. Check server logs for Telegram errors
+
+**Test Telegram**:
+```typescript
+// Test in Server Action
+import { sendTelegramMessage } from '@/core/lib/telegram'
+
+await sendTelegramMessage('Test message from DIDG System')
+```
+
+---
+
+## Security Best Practices
+
+### Secret Rotation
+
+Rotate sensitive credentials periodically:
+
+**Supabase Service Role Key**:
+1. Cannot be rotated directly
+2. Create new project and migrate if compromised
+3. Immediately update in Vercel if exposed
+
+**Telegram Bot Token**:
+1. Open @BotFather
+2. Send `/revoke`
+3. Select your bot
+4. Receive new token
+5. Update in Vercel
+
+### Access Control
+
+**Vercel Environment Variables**:
+- Limit team member access to production variables
+- Use Vercel Teams for role-based access
+- Audit variable changes regularly
+
+**Supabase Dashboard**:
+- Limit service role key access to leads only
+- Use anon key for most operations
+- Enable 2FA on Supabase accounts
+
+### Monitoring
+
+**Set up alerts for**:
+- Failed authentication attempts (Supabase logs)
+- Unauthorized service role key usage
+- Telegram API errors
+- Unusual database query patterns
+
+---
+
+## Quick Reference Table
+
+| Variable | Required | Scope | Sensitive | Service |
+|----------|----------|-------|-----------|----------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Public | No | Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Public | No | Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Server | **Yes** | Supabase |
+| `TELEGRAM_BOT_TOKEN` | No | Server | **Yes** | Telegram |
+| `TELEGRAM_CHAT_ID` | No | Server | No | Telegram |
+| `NEXT_PUBLIC_SITE_URL` | No | Public | No | Next.js |
+
+---
+
+## Related Documentation
+
+- [Deployment Overview](/deployment/overview) - Full deployment guide
+- [Supabase Setup](/deployment/supabase-setup) - Detailed Supabase configuration
+- [Security](/architecture/security) - Security implementation
+- [Development Setup](/development) - Local development setup

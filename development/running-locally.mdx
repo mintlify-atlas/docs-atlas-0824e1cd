@@ -1,0 +1,567 @@
+---
+title: 'Running Locally'
+description: 'Start and run the DIDG System development server on your local machine'
+icon: 'play'
+---
+
+# Running Locally
+
+This guide covers everything you need to know to run DIDG System on your local development machine.
+
+## Prerequisites
+
+Before you begin, ensure you have completed:
+
+<CardGroup cols={2}>
+  <Card title="Environment Setup" icon="laptop-code" href="/development/environment-setup">
+    Node.js 20+, npm/pnpm, VS Code, and Supabase CLI installed
+  </Card>
+  <Card title="Configuration" icon="gear" href="/development/configuration">
+    `.env.local` file created with all required variables
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the DIDG System repository to your local machine:
+
+    ```bash
+    git clone <repository-url> didg-website
+    cd didg-website
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all project dependencies:
+
+    ```bash
+    # Using npm (default)
+    npm install
+
+    # Or using pnpm (faster)
+    pnpm install
+    ```
+
+    **Available scripts from `package.json`:**
+    - `npm run dev` - Start development server
+    - `npm run build` - Create production build
+    - `npm run start` - Start production server
+    - `npm run lint` - Run ESLint
+
+    <Info>
+      The first install may take 2-5 minutes depending on your internet connection.
+    </Info>
+  </Step>
+
+  <Step title="Set Up Environment Variables">
+    Ensure your `.env.local` file is properly configured:
+
+    ```bash
+    # Verify .env.local exists
+    ls -la .env.local
+
+    # Should contain at minimum:
+    # NEXT_PUBLIC_SUPABASE_URL
+    # NEXT_PUBLIC_SUPABASE_ANON_KEY
+    # SUPABASE_SERVICE_ROLE_KEY
+    ```
+
+    See [Configuration Guide](/development/configuration) for details.
+  </Step>
+
+  <Step title="Start Development Server">
+    Start the Next.js development server:
+
+    ```bash
+    npm run dev
+    ```
+
+    **Output should show:**
+    ```bash
+    ▲ Next.js 14.1.0
+    - Local:        http://localhost:3000
+    - Ready in 2.3s
+    ```
+
+    <Tip>
+      The dev server supports Fast Refresh - your changes will appear instantly without losing component state!
+    </Tip>
+  </Step>
+
+  <Step title="Access the Application">
+    Open your browser and navigate to:
+
+    **http://localhost:3000**
+
+    You should see the DIDG System homepage.
+  </Step>
+</Steps>
+
+## Database Setup
+
+### Understanding Database Access
+
+DIDG System connects to a remote Supabase database using the credentials in your `.env.local` file. You have two options:
+
+<Tabs>
+  <Tab title="Remote Database (Recommended)">
+    **Use Supabase Cloud Database**
+
+    This is the simplest approach for development:
+
+    1. Your `.env.local` points to your Supabase cloud project
+    2. No local database setup required
+    3. Database schema is already provisioned
+    4. Share data with other developers
+
+    **Verifying connection:**
+    ```bash
+    # The dev server will show Supabase connection on startup
+    npm run dev
+    ```
+
+    If you see no errors, your database is connected!
+  </Tab>
+  <Tab title="Local Database (Advanced)">
+    **Run Supabase Locally**
+
+    For offline development or testing migrations:
+
+    ```bash
+    # Initialize Supabase locally
+    supabase init
+
+    # Start local Supabase (Docker required)
+    supabase start
+
+    # Apply migrations
+    supabase db push
+    ```
+
+    Update `.env.local` to use local instance:
+    ```bash
+    NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=<shown in supabase start output>
+    SUPABASE_SERVICE_ROLE_KEY=<shown in supabase start output>
+    ```
+
+    <Warning>
+      Local Supabase requires Docker Desktop to be running.
+    </Warning>
+  </Tab>
+</Tabs>
+
+### Database Migrations
+
+If you need to apply database schema changes:
+
+```bash
+# Link to your Supabase project
+supabase link --project-ref your-project-ref
+
+# Pull current schema
+supabase db pull
+
+# Apply migrations (if any)
+supabase db push
+```
+
+<Info>
+  Database schema is typically managed by the team. You usually don't need to run migrations for local development.
+</Info>
+
+### Seeding Test Data
+
+To populate your database with test data for development:
+
+<Steps>
+  <Step title="Using Supabase Dashboard">
+    **Manual data entry:**
+
+    1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
+    2. Select your project
+    3. Go to **Table Editor**
+    4. Add sample data to tables:
+       - `students` - Test student records
+       - `courses` - Course information
+       - `grades` - Sample grade data
+       - `resources` - Course materials
+  </Step>
+
+  <Step title="Using SQL Editor (Recommended)">
+    **Run seed scripts:**
+
+    1. In Supabase Dashboard, go to **SQL Editor**
+    2. Create sample data:
+
+    ```sql
+    -- Insert test student
+    INSERT INTO students (rut, name, email, career, level)
+    VALUES ('12345678-9', 'Test Student', 'test@example.com', 'Computer Science', 3);
+
+    -- Insert test course
+    INSERT INTO courses (code, name, semester, year)
+    VALUES ('CS101', 'Introduction to Programming', 1, 2024);
+
+    -- Insert test grade
+    INSERT INTO grades (student_rut, course_code, grade)
+    VALUES ('12345678-9', 'CS101', 6.5);
+    ```
+  </Step>
+
+  <Step title="Using Application UI">
+    **Create data through the app:**
+
+    1. Start dev server: `npm run dev`
+    2. Navigate to admin sections
+    3. Use forms to create:
+       - Students
+       - Courses
+       - Upload grades via Excel
+       - Add course materials
+  </Step>
+</Steps>
+
+## Development Workflow
+
+### File Structure
+
+Understanding the project structure:
+
+```
+didg-website/
+├── src/
+│   ├── app/                    # Next.js App Router pages
+│   │   ├── layout.tsx          # Root layout
+│   │   ├── page.tsx            # Homepage
+│   │   └── (routes)/           # Route groups
+│   ├── components/             # React components
+│   │   ├── ui/                 # Reusable UI components
+│   │   ├── courses/            # Course-related components
+│   │   ├── resources/          # Resource components
+│   │   └── .../                # Other feature components
+│   ├── core/                   # Business logic
+│   │   ├── actions/            # Server Actions
+│   │   └── lib/                # Utility functions
+│   ├── infrastructure/         # External services
+│   │   └── supabase/           # Supabase clients
+│   ├── context/                # React Context providers
+│   └── types/                  # TypeScript type definitions
+├── public/                     # Static assets
+├── next.config.js              # Next.js configuration
+├── tailwind.config.js          # Tailwind CSS configuration
+├── tsconfig.json               # TypeScript configuration
+└── package.json                # Dependencies and scripts
+```
+
+### Hot Reload
+
+Next.js Fast Refresh automatically updates your app when you make changes:
+
+- **Component edits** - Instant reload without losing state
+- **Server Actions** - Automatically recompiled
+- **CSS changes** - Applied immediately
+- **Config changes** - Require server restart
+
+**When to restart the dev server:**
+- After editing `.env.local`
+- After editing `next.config.js`
+- After editing `tailwind.config.js`
+- After installing new dependencies
+
+```bash
+# Stop server: Ctrl+C
+# Restart:
+npm run dev
+```
+
+### Making Changes
+
+<Tabs>
+  <Tab title="Frontend Changes">
+    **Editing UI Components:**
+
+    1. Navigate to `src/components/` or `src/app/`
+    2. Make changes to `.tsx` files
+    3. Save - changes appear instantly
+
+    **Example: Update a component**
+    ```tsx src/components/ui/Button.tsx
+    export function Button({ children }) {
+      return (
+        <button className="bg-primary text-white px-4 py-2 rounded">
+          {children}
+        </button>
+      )
+    }
+    ```
+  </Tab>
+  <Tab title="Backend Logic">
+    **Editing Server Actions:**
+
+    1. Navigate to `src/core/actions/`
+    2. Edit Server Action functions
+    3. Changes take effect immediately
+
+    **Example: Server Action**
+    ```typescript src/core/actions/students.ts
+    'use server'
+
+    export async function getStudents() {
+      const supabase = await createClient()
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+      return { data, error }
+    }
+    ```
+  </Tab>
+  <Tab title="Styling">
+    **Editing Styles:**
+
+    **Tailwind CSS:**
+    ```tsx
+    <div className="bg-surface p-4 rounded-lg shadow-lg">
+      Content
+    </div>
+    ```
+
+    **Global CSS:**
+    Edit `src/app/globals.css`
+
+    **Component styles:**
+    Use Tailwind utility classes or CSS modules
+  </Tab>
+</Tabs>
+
+## Debugging
+
+### Development Tools
+
+<AccordionGroup>
+  <Accordion title="Browser DevTools">
+    **Chrome/Firefox DevTools:**
+
+    - **Console** (F12) - View logs, errors, warnings
+    - **Network** - Monitor API calls to Supabase
+    - **React DevTools** - Inspect component tree and props
+    - **Sources** - Set breakpoints in browser code
+
+    **Useful console commands:**
+    ```javascript
+    // Log Supabase client
+    console.log(supabase)
+
+    // Debug state
+    console.log({ data, error })
+    ```
+  </Accordion>
+
+  <Accordion title="VS Code Debugging">
+    **Set up debugging in VS Code:**
+
+    Create `.vscode/launch.json`:
+    ```json
+    {
+      "version": "0.2.0",
+      "configurations": [
+        {
+          "name": "Next.js: debug server-side",
+          "type": "node-terminal",
+          "request": "launch",
+          "command": "npm run dev"
+        },
+        {
+          "name": "Next.js: debug client-side",
+          "type": "chrome",
+          "request": "launch",
+          "url": "http://localhost:3000"
+        }
+      ]
+    }
+    ```
+
+    **Usage:**
+    1. Set breakpoints in your code (click left gutter)
+    2. Press F5 or click Run → Start Debugging
+    3. Code execution will pause at breakpoints
+  </Accordion>
+
+  <Accordion title="Server Logs">
+    **Check terminal output for:**
+
+    - Compilation errors
+    - Runtime errors in Server Actions
+    - Supabase connection issues
+    - Telegram notification logs
+
+    **Enable verbose logging:**
+    ```typescript
+    // Add console.log in Server Actions
+    export async function myAction() {
+      console.log('Action called')
+      const result = await supabase.from('table').select()
+      console.log('Result:', result)
+      return result
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Supabase Logs">
+    **Check Supabase Dashboard:**
+
+    1. Go to **Logs** → **API Logs**
+    2. View recent database queries
+    3. Check for errors or slow queries
+    4. Monitor RLS policy violations
+
+    **Common issues:**
+    - 401/403 errors - Authentication/RLS issues
+    - 404 errors - Table/column not found
+    - 500 errors - Database constraint violations
+  </Accordion>
+</AccordionGroup>
+
+### Common Development Issues
+
+<AccordionGroup>
+  <Accordion title="Port 3000 already in use">
+    **Error:** `Port 3000 is already in use`
+
+    **Solutions:**
+    ```bash
+    # Option 1: Kill the process using port 3000
+    # macOS/Linux:
+    lsof -ti:3000 | xargs kill -9
+
+    # Windows:
+    netstat -ano | findstr :3000
+    taskkill /PID <PID> /F
+
+    # Option 2: Use a different port
+    PORT=3001 npm run dev
+    ```
+  </Accordion>
+
+  <Accordion title="Module not found errors">
+    **Error:** `Module not found: Can't resolve '@/...'`
+
+    **Solutions:**
+    1. Verify path alias is correct: `@/` maps to `src/`
+    2. Restart TypeScript server: Cmd+Shift+P → "TypeScript: Restart TS Server"
+    3. Clear Next.js cache:
+       ```bash
+       rm -rf .next
+       npm run dev
+       ```
+  </Accordion>
+
+  <Accordion title="Supabase client errors">
+    **Error:** `supabaseUrl is required` or `Invalid API key`
+
+    **Solutions:**
+    1. Check `.env.local` has all required variables
+    2. Restart dev server after changing `.env.local`
+    3. Verify no extra spaces in environment variables
+    4. Check Supabase project is not paused
+  </Accordion>
+
+  <Accordion title="Build/Type errors">
+    **Error:** TypeScript compilation errors
+
+    **Solutions:**
+    ```bash
+    # Check for type errors
+    npm run build
+
+    # Common fixes:
+    # 1. Add type annotations
+    const data: Student[] = await getStudents()
+
+    # 2. Fix import paths
+    import { Button } from '@/components/ui/button'
+
+    # 3. Install missing type definitions
+    npm install --save-dev @types/package-name
+    ```
+  </Accordion>
+
+  <Accordion title="Hot reload not working">
+    **Issue:** Changes not appearing in browser
+
+    **Solutions:**
+    1. Hard refresh: Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows)
+    2. Clear browser cache
+    3. Restart dev server
+    4. Check file is saved
+    5. Verify file is in `content` paths in `tailwind.config.js`
+  </Accordion>
+
+  <Accordion title="Telegram notifications not sending">
+    **Issue:** No Telegram messages received
+
+    **Debug steps:**
+    1. Check terminal for Telegram warnings
+    2. Verify bot token and chat ID in `.env.local`
+    3. Ensure you've sent a message to the bot first
+    4. Check network connectivity
+    5. Look for errors in `src/core/lib/telegram.ts`
+
+    **Test Telegram connection:**
+    ```bash
+    curl https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getMe
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Testing Your Setup
+
+### Verify Everything Works
+
+<Steps>
+  <Step title="Homepage Loads">
+    Navigate to `http://localhost:3000` - should show DIDG homepage
+  </Step>
+
+  <Step title="Database Connection">
+    Check browser console for no Supabase errors
+  </Step>
+
+  <Step title="Authentication Works">
+    Try logging in (if auth is set up)
+  </Step>
+
+  <Step title="Data Fetching">
+    Navigate to pages that load data (courses, students)
+  </Step>
+
+  <Step title="File Uploads">
+    Try uploading a course material (if you have permissions)
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture Overview" icon="diagram-project" href="/architecture/overview">
+    Understand the system architecture and design patterns
+  </Card>
+  <Card title="Authentication" icon="shield-halved" href="/features/authentication">
+    Learn about authentication and security features
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/authentication">
+    Explore Server Actions and API endpoints
+  </Card>
+  <Card title="User Guides" icon="book-open" href="/guides/student-guide">
+    Complete guides for students and administrators
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- **Next.js Dev Docs**: [nextjs.org/docs](https://nextjs.org/docs)
+- **Supabase Docs**: [supabase.com/docs](https://supabase.com/docs)
+- **Tailwind CSS**: [tailwindcss.com/docs](https://tailwindcss.com/docs)
+- **TypeScript Handbook**: [typescriptlang.org/docs](https://www.typescriptlang.org/docs/)

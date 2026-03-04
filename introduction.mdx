@@ -1,0 +1,177 @@
+---
+title: Introduction
+description: Welcome to DIDG System - A comprehensive academic management platform for engineering students and teaching assistants
+---
+
+# Welcome to DIDG System
+
+DIDG System is a modern SaaS platform designed specifically for engineering students and teaching assistants. It provides a comprehensive suite of tools for managing academic resources, organizing teaching assistant sessions (ayudantías), and accessing helpful utilities for students.
+
+## Who Is This For?
+
+DIDG System serves two primary user groups:
+
+**Engineering Students**
+- Access course materials and resources organized by subject
+- View timeline of past and upcoming teaching assistant sessions
+- Bookmark favorite resources and ayudantías for quick access
+- Track academic grades and calculate potential outcomes
+- Use built-in tools like the grade simulator
+- Navigate quickly using the command terminal (Ctrl+K)
+
+**Teaching Assistants**
+- Manage course materials and resources
+- Schedule and organize ayudantía sessions with video links
+- Upload grades and track student progress
+- Share resources with students efficiently
+- Receive real-time notifications via Telegram
+- Secure administrative actions with 2FA
+
+## Key Benefits
+
+<Info>
+DIDG System combines modern web technologies with a focus on user experience, security, and mobile-first design.
+</Info>
+
+### Academic Organization
+- **Timeline View**: Chronological display of past and future ayudantía sessions
+- **Resource Library**: Filterable by tags and subjects for easy discovery
+- **Personal Bookmarks**: Save and organize your favorite materials
+- **Grade Tracking**: View academic performance across all enrolled courses
+
+### Security & Authentication
+- **Supabase Auth**: Secure login system with session management
+- **Two-Factor Authentication**: Telegram-based 2FA for administrative actions
+- **Row Level Security**: Database-level protection ensuring data privacy
+- **Protected Routes**: Middleware-based route protection
+
+### Modern User Experience
+- **Dark/Light Mode**: Native theme support with system preference detection
+- **Responsive Design**: Optimized for mobile devices with adaptive layouts
+- **Command Terminal**: Quick navigation with keyboard shortcuts (Ctrl+K)
+- **Zen Mode**: Clean interface for distraction-free mobile viewing
+- **Interactive Mascot**: Charmander pet that reacts to scroll and user activity
+
+## Core Features
+
+### For Students
+
+<CardGroup cols={2}>
+  <Card title="Ayudantía Timeline" icon="calendar">
+    Browse chronological view of teaching assistant sessions with materials and video links
+  </Card>
+  
+  <Card title="Resource Library" icon="book">
+    Access filterable academic resources organized by subject and tags
+  </Card>
+  
+  <Card title="Grade Simulator" icon="calculator">
+    Calculate potential final grades with client-side persistence
+  </Card>
+  
+  <Card title="Bookmarks" icon="bookmark">
+    Save and organize your favorite resources and ayudantías
+  </Card>
+</CardGroup>
+
+### For Teaching Assistants
+
+<CardGroup cols={2}>
+  <Card title="Material Management" icon="upload">
+    Upload and organize course materials with file storage
+  </Card>
+  
+  <Card title="Grade Upload" icon="table">
+    Bulk upload student grades via Excel/CSV files
+  </Card>
+  
+  <Card title="Telegram Notifications" icon="bell">
+    Real-time notifications for student requests and feedback
+  </Card>
+  
+  <Card title="Analytics Dashboard" icon="chart-line">
+    Track resource downloads and student engagement
+  </Card>
+</CardGroup>
+
+## Technology Stack
+
+DIDG System is built with modern, production-ready technologies:
+
+- **Framework**: Next.js 14 with App Router and TypeScript
+- **Styling**: Tailwind CSS, Shadcn/ui components, Framer Motion animations
+- **Backend**: Supabase (PostgreSQL, Authentication, Row Level Security)
+- **Integrations**: Telegram Bot API for real-time notifications
+- **State Management**: React Context API with Server Actions
+
+<Note>
+The platform follows clean architecture principles and implements SOLID design patterns for maintainability and scalability.
+</Note>
+
+## Architecture Highlights
+
+### Clean Architecture
+The codebase is organized following clean architecture principles:
+
+```
+src/
+├── app/                    # Next.js App Router pages
+├── components/             # React components organized by feature
+├── core/
+│   ├── actions/           # Server Actions for business logic
+│   ├── lib/               # Core libraries (Telegram, utilities)
+│   └── utils/             # Helper functions
+├── infrastructure/
+│   └── supabase/          # Database client configuration
+└── types/                 # TypeScript type definitions
+```
+
+### Server Actions
+The platform uses Next.js Server Actions for secure backend operations:
+
+```typescript
+// Example: Toggle bookmark on a resource
+export async function toggleBookmark(resourceId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) return { ok: false, message: "No autenticado" };
+
+  const { data: existing } = await supabase
+    .from("resource_bookmarks")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("resource_id", resourceId)
+    .single();
+
+  if (existing) {
+    await supabase
+      .from("resource_bookmarks")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("resource_id", resourceId);
+  } else {
+    await supabase
+      .from("resource_bookmarks")
+      .insert({ user_id: user.id, resource_id: resourceId });
+  }
+
+  revalidatePath("/resources");
+  revalidatePath("/profile");
+  return { ok: true, isBookmarked: !existing };
+}
+```
+
+## What's Next?
+
+Ready to get started? Here are some helpful resources:
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get up and running in minutes
+  </Card>
+  
+  <Card title="Installation" icon="download" href="/installation">
+    Detailed installation guide
+  </Card>
+</CardGroup>

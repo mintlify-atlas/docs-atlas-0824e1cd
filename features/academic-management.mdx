@@ -1,0 +1,536 @@
+---
+title: "Academic Management"
+description: "Teaching assistant sessions, timeline view, grade management, and student progress tracking"
+icon: "graduation-cap"
+---
+
+## Overview
+
+The Academic Management system allows administrators to organize teaching assistant sessions (ayudantías), manage course materials, and track student progress across multiple semesters and subjects.
+
+<Note>
+  Teaching sessions support video recordings, downloadable materials, and automatic file management through Supabase Storage.
+</Note>
+
+## Core Features
+
+<CardGroup cols={2}>
+  <Card title="Semester Management" icon="calendar">
+    Create and activate academic semesters with automatic course organization
+  </Card>
+  <Card title="Subject Organization" icon="book">
+    Define subjects with codes, assign to semesters, and track enrollments
+  </Card>
+  <Card title="Teaching Sessions" icon="chalkboard-teacher">
+    Schedule ayudantías with materials, video links, and descriptions
+  </Card>
+  <Card title="File Management" icon="file">
+    Automatic file upload, storage, and signed URL generation for secure downloads
+  </Card>
+</CardGroup>
+
+## Semester Management
+
+Semesters are the top-level organizational unit in DIDG.
+
+### Create Semester
+
+**Source:** `academic.ts:18-37`
+
+<ParamField path="name" type="string" required>
+  Semester identifier (e.g., "2025-1", "2025-2")
+  
+  Minimum length: 4 characters
+</ParamField>
+
+```typescript
+export async function createSemester(formData: FormData) {
+  const supabase = await createClient();
+  const name = formData.get("name") as string;
+
+  const parsed = SemesterSchema.safeParse({ name });
+  if (!parsed.success) throw new Error("Invalid semester name");
+
+  const { error } = await supabase.from("semesters").insert({
+    name: parsed.data.name,
+    is_active: true,
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/courses");
+}
+```
+
+<ResponseField name="is_active" type="boolean" default={true}>
+  New semesters are created as active by default
+</ResponseField>
+
+### Toggle Semester Status
+
+**Source:** `academic.ts:65-70`
+
+Activate or deactivate semesters to control visibility:
+
+<ParamField path="id" type="string (uuid)" required>
+  Semester ID to toggle
+</ParamField>
+
+<ParamField path="currentStatus" type="boolean" required>
+  Current active status
+</ParamField>
+
+```typescript
+export async function toggleSemesterStatus(id: string, currentStatus: boolean) {
+  const supabase = await createClient();
+  await supabase.from("semesters").update({ is_active: !currentStatus }).eq("id", id);
+  revalidatePath("/dashboard/courses");
+}
+```
+
+## Subject Management
+
+### Create Subject
+
+**Source:** `academic.ts:40-61`
+
+Subjects belong to semesters and contain teaching sessions.
+
+<ParamField path="name" type="string" required>
+  Subject name (minimum 3 characters)
+</ParamField>
+
+<ParamField path="code" type="string" required>
+  Subject code (e.g., "IWI-131", "MAT-021")
+  
+  Minimum length: 3 characters
+</ParamField>
+
+<ParamField path="semester_id" type="string (uuid)" required>
+  ID of the parent semester
+</ParamField>
+
+```typescript
+const SubjectSchema = z.object({
+  name: z.string().min(3),
+  code: z.string().min(3),
+  semester_id: z.string().uuid(),
+});
+
+export async function createSubject(formData: FormData) {
+  const supabase = await createClient();
+  
+  const rawData = {
+    name: formData.get("name"),
+    code: formData.get("code"),
+    semester_id: formData.get("semester_id"),
+  };
+
+  const parsed = SubjectSchema.safeParse(rawData);
+  if (!parsed.success) throw new Error("Invalid subject data");
+
+  const { error } = await supabase.from("subjects").insert({
+    name: parsed.data.name,
+    code: parsed.data.code,
+    semester_id: parsed.data.semester_id,
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/courses");
+}
+```
+
+### Delete Subject
+
+**Source:** `academic.ts:73-83`
+
+<Warning>
+  Deleting a subject will cascade delete all associated teaching sessions and enrollments if configured with `ON DELETE CASCADE`.
+</Warning>
+
+<ParamField path="subjectId" type="string (uuid)" required>
+  ID of the subject to delete
+</ParamField>
+
+```typescript
+export async function deleteSubject(subjectId: string) {
+  const supabase = await createClient();
+  
+  const { error } = await supabase.from("subjects").delete().eq("id", subjectId);
+  if (error) throw new Error("Error deleting subject: " + error.message);
+  
+  revalidatePath("/dashboard/courses");
+}
+```
+
+## Teaching Sessions (Ayudantías)
+
+### Create Session
+
+**Source:** `ayudantias.ts:15-53`
+
+Teaching sessions support materials upload and video links.
+
+<ParamField path="title" type="string" required>
+  Session title (minimum 3 characters)
+</ParamField>
+
+<ParamField path="description" type="string" optional>
+  Detailed description of the session content
+</ParamField>
+
+<ParamField path="date" type="string (ISO date)" required>
+  Session date
+</ParamField>
+
+<ParamField path="subject_id" type="string (uuid)" required>
+  Parent subject ID
+</ParamField>
+
+<ParamField path="video_url" type="string (URL)" optional>
+  Link to recorded session (YouTube, Vimeo, etc.)
+</ParamField>
+
+<ParamField path="file" type="File" optional>
+  Course material (PDF, slides, etc.)
+</ParamField>
+
+```typescript
+const AyudantiaSchema = z.object({
+  title: z.string().min(3),
+  description: z.string().optional(),
+  date: z.string(),
+  subject_id: z.string().uuid(),
+  video_url: z.string().url().optional().or(z.literal("")),
+});
+
+export async function createAyudantia(formData: FormData) {
+  const supabase = await createClient();
+  
+  const rawData = {
+    title: formData.get("title"),
+    description: formData.get("description"),
+    date: formData.get("date"),
+    subject_id: formData.get("subject_id"),
+    video_url: formData.get("video_url"),
+  };
+
+  const parsed = AyudantiaSchema.safeParse(rawData);
+  if (!parsed.success) throw new Error("Invalid data");
+
+  // Handle file upload
+  const file = formData.get("file") as File;
+  let materialUrl = null;
+
+  if (file && file.size > 0) {
+    const filePath = `${parsed.data.subject_id}/${Date.now()}_${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("course-materials")
+      .upload(filePath, file);
+    if (uploadError) throw new Error("Error uploading file");
+    materialUrl = filePath;
+  }
+
+  const { error } = await supabase.from("ayudantias").insert({
+    title: parsed.data.title,
+    description: parsed.data.description,
+    date: parsed.data.date,
+    subject_id: parsed.data.subject_id,
+    video_url: parsed.data.video_url || null,
+    material_url: materialUrl,
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath(`/dashboard/courses/${parsed.data.subject_id}`);
+}
+```
+
+<ResponseField name="material_url" type="string | null">
+  Storage path to the uploaded file, or null if no file was provided
+</ResponseField>
+
+### Update Session
+
+**Source:** `ayudantias.ts:55-110`
+
+Updating supports replacing existing materials while cleaning up old files.
+
+<Note>
+  When a new file is uploaded, the old file is automatically deleted from storage to prevent waste.
+</Note>
+
+```typescript
+export async function updateAyudantia(id: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const rawData = {
+    title: formData.get("title"),
+    description: formData.get("description"),
+    date: formData.get("date"),
+    subject_id: formData.get("subject_id"),
+    video_url: formData.get("video_url"),
+  };
+
+  const parsed = AyudantiaSchema.safeParse(rawData);
+  if (!parsed.success) throw new Error("Invalid data");
+
+  const file = formData.get("file") as File;
+  let newMaterialPath = undefined;
+
+  if (file && file.size > 0) {
+    // Get old file to delete it
+    const { data } = await supabase
+      .from("ayudantias")
+      .select("material_url")
+      .eq("id", id)
+      .single();
+    
+    // Upload new file
+    const filePath = `${parsed.data.subject_id}/${Date.now()}_${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("course-materials")
+      .upload(filePath, file);
+    if (uploadError) throw new Error("Error uploading new file");
+    
+    newMaterialPath = filePath;
+
+    // Delete old file
+    if (data?.material_url) {
+      await supabase.storage.from("course-materials").remove([data.material_url]);
+    }
+  }
+
+  const updates: any = {
+    title: parsed.data.title,
+    description: parsed.data.description,
+    date: parsed.data.date,
+    video_url: parsed.data.video_url || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (newMaterialPath) {
+    updates.material_url = newMaterialPath;
+  }
+
+  const { error } = await supabase.from("ayudantias").update(updates).eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/dashboard/courses/${parsed.data.subject_id}`);
+}
+```
+
+### Delete Session
+
+**Source:** `ayudantias.ts:113-133`
+
+<ParamField path="id" type="string (uuid)" required>
+  Session ID to delete
+</ParamField>
+
+<ParamField path="subjectId" type="string (uuid)" required>
+  Parent subject ID for cache revalidation
+</ParamField>
+
+```typescript
+export async function deleteAyudantia(id: string, subjectId: string) {
+  const supabase = await createClient();
+
+  // Get file before deleting record
+  const { data: ayudantia } = await supabase
+    .from("ayudantias")
+    .select("material_url")
+    .eq("id", id)
+    .single();
+
+  // Delete database record
+  const { error } = await supabase.from("ayudantias").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+
+  // Delete file from storage
+  if (ayudantia?.material_url) {
+    await supabase.storage.from("course-materials").remove([ayudantia.material_url]);
+  }
+
+  revalidatePath(`/dashboard/courses/${subjectId}`);
+}
+```
+
+## Secure File Access
+
+### Generate Signed URLs
+
+**Source:** `ayudantias.ts:135-149`
+
+For security, files are not publicly accessible. Signed URLs provide temporary access.
+
+<ParamField path="filePath" type="string" required>
+  Storage path to the file (from `material_url`)
+</ParamField>
+
+```typescript
+export async function getSignedUrl(filePath: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.storage
+    .from("course-materials")
+    .createSignedUrl(filePath, 60); // 60 seconds validity
+
+  if (error) {
+    console.error("Error signing URL:", error);
+    throw new Error("Could not generate download link");
+  }
+
+  return data.signedUrl;
+}
+```
+
+<ResponseField name="signedUrl" type="string">
+  Temporary URL valid for 60 seconds
+</ResponseField>
+
+<Warning>
+  Signed URLs expire after 60 seconds. Generate a new URL for each download request.
+</Warning>
+
+## Data Validation
+
+All academic management functions use Zod schemas for type safety:
+
+<Tabs>
+  <Tab title="Semester Schema">
+    ```typescript
+    const SemesterSchema = z.object({
+      name: z.string().min(4, "E.g., 2025-1"),
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Subject Schema">
+    ```typescript
+    const SubjectSchema = z.object({
+      name: z.string().min(3),
+      code: z.string().min(3),
+      semester_id: z.string().uuid(),
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Ayudantia Schema">
+    ```typescript
+    const AyudantiaSchema = z.object({
+      title: z.string().min(3),
+      description: z.string().optional(),
+      date: z.string(),
+      subject_id: z.string().uuid(),
+      video_url: z.string().url().optional().or(z.literal("")),
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Storage Organization
+
+Files are organized in Supabase Storage with this structure:
+
+```
+course-materials/
+├── {subject_id}/
+│   ├── {timestamp}_{filename}.pdf
+│   ├── {timestamp}_{filename}.pptx
+│   └── ...
+└── ...
+```
+
+**Naming Convention:**
+- Bucket: `course-materials`
+- Path: `{subject_id}/{timestamp}_{original_filename}`
+- Example: `a1b2c3d4-uuid/1709567890123_lecture_01.pdf`
+
+## Cache Revalidation
+
+DIDG uses Next.js cache revalidation to keep data fresh:
+
+```typescript
+// Revalidate specific subject page
+revalidatePath(`/dashboard/courses/${subject_id}`);
+
+// Revalidate all courses
+revalidatePath("/dashboard/courses");
+```
+
+<Note>
+  Every create, update, and delete operation automatically revalidates the relevant pages.
+</Note>
+
+## Database Schema
+
+### Semesters Table
+```sql
+semesters {
+  id: uuid (PK)
+  name: text
+  is_active: boolean
+  created_at: timestamp
+}
+```
+
+### Subjects Table
+```sql
+subjects {
+  id: uuid (PK)
+  name: text
+  code: text
+  semester_id: uuid (FK -> semesters.id)
+  created_at: timestamp
+}
+```
+
+### Ayudantias Table
+```sql
+ayudantias {
+  id: uuid (PK)
+  title: text
+  description: text
+  date: date
+  subject_id: uuid (FK -> subjects.id)
+  video_url: text
+  material_url: text
+  created_at: timestamp
+  updated_at: timestamp
+}
+```
+
+## Usage Example
+
+```tsx
+import { createSemester, createSubject, createAyudantia, getSignedUrl } from '@/core/actions';
+
+// Create academic hierarchy
+const setupCourse = async () => {
+  // 1. Create semester
+  const semesterForm = new FormData();
+  semesterForm.set('name', '2025-1');
+  await createSemester(semesterForm);
+
+  // 2. Create subject
+  const subjectForm = new FormData();
+  subjectForm.set('name', 'Programación Avanzada');
+  subjectForm.set('code', 'IWI-131');
+  subjectForm.set('semester_id', semesterId);
+  await createSubject(subjectForm);
+
+  // 3. Create teaching session
+  const sessionForm = new FormData();
+  sessionForm.set('title', 'Introducción a TypeScript');
+  sessionForm.set('description', 'Conceptos básicos y sintaxis');
+  sessionForm.set('date', '2025-03-15');
+  sessionForm.set('subject_id', subjectId);
+  sessionForm.set('video_url', 'https://youtube.com/watch?v=...');
+  sessionForm.set('file', pdfFile);
+  await createAyudantia(sessionForm);
+};
+
+// Download material
+const downloadMaterial = async (materialPath: string) => {
+  const url = await getSignedUrl(materialPath);
+  window.open(url, '_blank');
+};
+```

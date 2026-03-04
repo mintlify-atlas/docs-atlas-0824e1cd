@@ -1,0 +1,295 @@
+---
+title: 'Environment Setup'
+description: 'Complete guide to setting up your development environment for DIDG System'
+icon: 'laptop-code'
+---
+
+# Development Environment Setup
+
+This guide walks you through setting up your local development environment for the DIDG System, a Next.js-based academic management platform.
+
+## Prerequisites
+
+Before you begin, ensure your system meets the following requirements:
+
+### Required Software
+
+<Steps>
+  <Step title="Install Node.js 20+">
+    The DIDG System requires Node.js version 20 or higher.
+
+    **Download and install:**
+    ```bash
+    # Check your current Node.js version
+    node --version
+
+    # Should output v20.x.x or higher
+    ```
+
+    **Recommended installation methods:**
+    - **macOS/Linux**: Use [nvm](https://github.com/nvm-sh/nvm) for version management
+      ```bash
+      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+      nvm install 20
+      nvm use 20
+      ```
+    - **Windows**: Download from [nodejs.org](https://nodejs.org/) or use [nvm-windows](https://github.com/coreybutler/nvm-windows)
+
+    <Warning>
+      Node.js versions below 20 are not supported and may cause compatibility issues with Next.js 14 and dependencies.
+    </Warning>
+  </Step>
+
+  <Step title="Install Package Manager">
+    The project uses **npm** by default, but also supports **pnpm** for faster installs.
+
+    **npm** comes bundled with Node.js. Verify installation:
+    ```bash
+    npm --version
+    ```
+
+    **Optional: Install pnpm** (recommended for faster dependency management):
+    ```bash
+    npm install -g pnpm
+    pnpm --version
+    ```
+  </Step>
+
+  <Step title="Install Git">
+    Git is required for version control.
+
+    ```bash
+    # Check if Git is installed
+    git --version
+
+    # Install Git if needed
+    # macOS: Already installed with Xcode Command Line Tools
+    # Linux (Ubuntu/Debian):
+    sudo apt-get install git
+
+    # Windows: Download from https://git-scm.com/
+    ```
+
+    **Configure Git:**
+    ```bash
+    git config --global user.name "Your Name"
+    git config --global user.email "your.email@example.com"
+    ```
+  </Step>
+
+  <Step title="Install VS Code (Recommended)">
+    Visual Studio Code is the recommended IDE for DIDG development.
+
+    **Download:** [code.visualstudio.com](https://code.visualstudio.com/)
+
+    **Recommended Extensions:**
+
+    Install these extensions for the best development experience:
+
+    ```bash
+    # Core extensions
+    code --install-extension dbaeumer.vscode-eslint
+    code --install-extension esbenp.prettier-vscode
+    code --install-extension bradlc.vscode-tailwindcss
+    code --install-extension formulahendry.auto-rename-tag
+    
+    # TypeScript & React
+    code --install-extension dsznajder.es7-react-js-snippets
+    code --install-extension ms-vscode.vscode-typescript-next
+    
+    # Supabase
+    code --install-extension supabase.supabase-vscode
+    
+    # Git
+    code --install-extension eamodio.gitlens
+    ```
+
+    **Essential Extensions:**
+    - **ESLint** - JavaScript/TypeScript linting
+    - **Prettier** - Code formatting
+    - **Tailwind CSS IntelliSense** - Autocomplete for Tailwind classes
+    - **Auto Rename Tag** - Automatically rename paired HTML/JSX tags
+    - **ES7+ React/Redux/React-Native snippets** - Code snippets for React
+    - **Supabase** - Supabase integration and SQL syntax highlighting
+    - **GitLens** - Enhanced Git capabilities
+
+    <Tip>
+      Create a `.vscode/settings.json` in your project root for consistent formatting:
+      ```json
+      {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": true
+        },
+        "tailwindCSS.experimental.classRegex": [
+          ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"]
+        ]
+      }
+      ```
+    </Tip>
+  </Step>
+
+  <Step title="Install Supabase CLI">
+    The Supabase CLI is required for database migrations and local development.
+
+    **macOS/Linux:**
+    ```bash
+    # Using Homebrew (macOS)
+    brew install supabase/tap/supabase
+
+    # Using npm (all platforms)
+    npm install -g supabase
+
+    # Verify installation
+    supabase --version
+    ```
+
+    **Windows:**
+    ```bash
+    # Using npm
+    npm install -g supabase
+
+    # Using Scoop
+    scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+    scoop install supabase
+    ```
+
+    **Login to Supabase:**
+    ```bash
+    supabase login
+    ```
+
+    <Info>
+      The Supabase CLI is included as a dev dependency in `package.json`, so it will be available locally after running `npm install`.
+    </Info>
+  </Step>
+
+  <Step title="Set Up Telegram Bot (Optional)">
+    DIDG System uses Telegram for notifications. This step is optional but recommended.
+
+    **Create a Telegram Bot:**
+
+    1. Open Telegram and search for [@BotFather](https://t.me/botfather)
+    2. Send `/newbot` command
+    3. Follow the prompts to:
+       - Choose a name for your bot (e.g., "DIDG Dev Bot")
+       - Choose a username (must end in 'bot', e.g., "didg_dev_bot")
+    4. Save the **Bot Token** provided by BotFather
+
+    **Get Your Chat ID:**
+
+    1. Start a conversation with your new bot
+    2. Send any message to the bot
+    3. Visit: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+    4. Look for `"chat":{"id":YOUR_CHAT_ID}` in the response
+    5. Save your **Chat ID**
+
+    <Warning>
+      Keep your Bot Token secret! Never commit it to version control.
+    </Warning>
+
+    You'll use these credentials in your `.env.local` file (covered in [Configuration](/development/configuration)).
+  </Step>
+</Steps>
+
+## Additional Development Tools
+
+### Browser Extensions
+
+Install these browser extensions for better debugging:
+
+- **React Developer Tools** - Inspect React component hierarchies
+  - [Chrome](https://chrome.google.com/webstore/detail/react-developer-tools/fmkadmapgofadopljbjfkapdkoienihi)
+  - [Firefox](https://addons.mozilla.org/en-US/firefox/addon/react-devtools/)
+
+- **Redux DevTools** (if using Redux/Zustand) - State management debugging
+  - [Chrome](https://chrome.google.com/webstore/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd)
+
+### Terminal Recommendations
+
+For a better development experience:
+
+- **macOS**: [iTerm2](https://iterm2.com/) with [Oh My Zsh](https://ohmyz.sh/)
+- **Windows**: [Windows Terminal](https://aka.ms/terminal) with [PowerShell 7](https://aka.ms/powershell)
+- **Linux**: [Terminator](https://gnome-terminator.org/) or your distribution's default
+
+## Verify Your Setup
+
+Run these commands to verify your environment is ready:
+
+```bash
+# Node.js version (should be 20+)
+node --version
+
+# npm version
+npm --version
+
+# Git version
+git --version
+
+# Supabase CLI version
+supabase --version
+
+# Optional: pnpm version
+pnpm --version
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/development/configuration">
+    Set up environment variables and project configuration
+  </Card>
+  <Card title="Running Locally" icon="play" href="/development/running-locally">
+    Start the development server and begin coding
+  </Card>
+</CardGroup>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Node.js version mismatch">
+    If you see errors about Node.js version:
+
+    ```bash
+    # Switch to Node.js 20 using nvm
+    nvm use 20
+    
+    # Or install it if not available
+    nvm install 20
+    ```
+  </Accordion>
+
+  <Accordion title="Permission errors on macOS/Linux">
+    If you encounter permission errors when installing global packages:
+
+    ```bash
+    # Fix npm permissions
+    mkdir ~/.npm-global
+    npm config set prefix '~/.npm-global'
+    
+    # Add to PATH (add to ~/.bashrc or ~/.zshrc)
+    export PATH=~/.npm-global/bin:$PATH
+    ```
+  </Accordion>
+
+  <Accordion title="Supabase CLI not found">
+    If `supabase` command is not recognized:
+
+    ```bash
+    # Install globally with npm
+    npm install -g supabase
+    
+    # Or use npx to run without global install
+    npx supabase --version
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Additional Resources
+
+- [Node.js Documentation](https://nodejs.org/docs/)
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Supabase CLI Reference](https://supabase.com/docs/reference/cli)
+- [VS Code Tips and Tricks](https://code.visualstudio.com/docs/getstarted/tips-and-tricks)

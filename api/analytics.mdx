@@ -1,0 +1,540 @@
+---
+title: 'Analytics API'
+description: 'Server actions for tracking downloads and retrieving analytics data for admin dashboards'
+---
+
+## Overview
+
+The Analytics API provides event tracking and data aggregation for the DIDG System. Currently focused on download analytics, it enables:
+- **Event Tracking**: Record user downloads with context
+- **Aggregation**: Group and count downloads by subject
+- **Activity Feeds**: Display recent download activity
+
+All analytics use the `analytics_events` table with flexible event types for future expansion.
+
+---
+
+## trackDownload
+
+Records a download event when a user accesses a resource file. This is a "fire and forget" operation that won't block the download.
+
+```typescript
+export async function trackDownload(
+  resourceName: string,
+  subjectName: string
+): Promise<void>
+```
+
+### Parameters
+
+<ParamField body="resourceName" type="string" required>
+  Name or title of the downloaded resource (e.g., "Lecture 5 - Algorithms.pdf")
+</ParamField>
+
+<ParamField body="subjectName" type="string" required>
+  Name of the subject/course the resource belongs to (e.g., "Data Structures")
+</ParamField>
+
+### Return Values
+
+None (void) - This function does not return a value or throw errors to avoid blocking downloads.
+
+### Behavior
+
+1. **User Context**: Retrieves current authenticated user (if any)
+2. **Event Recording**: Inserts event into `analytics_events` table with:
+   - `event_type`: `"download"`
+   - `resource_name`: Provided resource name
+   - `subject_name`: Provided subject name
+   - `user_id`: User ID or `null` for anonymous downloads
+   - `created_at`: Automatic timestamp
+3. **Non-blocking**: Does not await result or handle errors (fire and forget)
+
+### Database Insert
+
+```typescript
+await supabase.from("analytics_events").insert({
+  event_type: "download",
+  resource_name: resourceName,
+  subject_name: subjectName,
+  user_id: user?.id || null,
+});
+```
+
+### Usage Example
+
+```typescript
+import { trackDownload } from '@/core/actions/analytics';
+import { getSignedUrl } from '@/core/actions/ayudantias';
+
+async function handleDownload(ayudantia: Ayudantia, subject: Subject) {
+  // Track the download (async, won't block)
+  trackDownload(ayudantia.title, subject.name);
+  
+  // Generate and open download URL
+  const url = await getSignedUrl(ayudantia.material_url);
+  window.open(url, '_blank');
+}
+```
+
+### Button Component Example
+
+```typescript
+import { trackDownload } from '@/core/actions/analytics';
+
+function DownloadButton({ resource, subject }: Props) {
+  async function handleClick() {
+    // Track before download
+    await trackDownload(resource.title, subject.name);
+    
+    // Trigger download
+    const link = document.createElement('a');
+    link.href = resource.file_url;
+    link.download = resource.title;
+    link.click();
+  }
+  
+  return (
+    <button onClick={handleClick}>
+      Download {resource.title}
+    </button>
+  );
+}
+```
+
+### Anonymous Tracking
+
+The function gracefully handles unauthenticated users:
+
+```typescript
+const { data: { user } } = await supabase.auth.getUser();
+// user will be null if not authenticated
+
+await supabase.from("analytics_events").insert({
+  user_id: user?.id || null,  // null for anonymous downloads
+  // ... other fields
+});
+```
+
+---
+
+## getDownloadsBySubject
+
+Retrieves download counts aggregated by subject for analytics dashboards. **Admin-only function.**
+
+```typescript
+export async function getDownloadsBySubject(): Promise<Array<{
+  name: string;
+  value: number;
+}>>
+```
+
+### Parameters
+
+None
+
+### Return Values
+
+<ResponseField name="data" type="Array<{ name: string; value: number }>">
+  Array of objects containing subject names and download counts, sorted by popularity (descending).
+  
+  Example:
+  ```typescript
+  [
+    { name: "Data Structures", value: 156 },
+    { name: "Algorithms", value: 142 },
+    { name: "Web Development", value: 98 },
+    { name: "Otros", value: 23 }  // "Otros" = resources without subject
+  ]
+  ```
+  
+  Returns empty array if query fails or no data exists.
+</ResponseField>
+
+### Behavior
+
+1. **Admin Query**: Uses `createAdminClient()` to bypass RLS
+2. **Data Retrieval**: Fetches all download events from `analytics_events`
+3. **Aggregation**: Groups events by `subject_name` and counts occurrences
+4. **Sorting**: Orders by download count (most popular first)
+5. **Null Handling**: Maps null/empty subject names to `"Otros"`
+
+### Aggregation Logic
+
+```typescript
+// Raw data: [{ subject_name: 'A' }, { subject_name: 'A' }, { subject_name: 'B' }]
+
+const countMap: Record<string, number> = {};
+
+data.forEach((item) => {
+  const subject = item.subject_name || "Otros";
+  countMap[subject] = (countMap[subject] || 0) + 1;
+});
+
+// Result: { 'A': 2, 'B': 1 }
+
+// Convert to array for charts
+return Object.entries(countMap)
+  .map(([name, value]) => ({ name, value }))
+  .sort((a, b) => b.value - a.value);
+
+// Final: [{ name: 'A', value: 2 }, { name: 'B', value: 1 }]
+```
+
+### Usage Example
+
+```typescript
+import { getDownloadsBySubject } from '@/core/actions/analytics';
+import { BarChart, Bar, XAxis, YAxis } from 'recharts';
+
+async function DownloadsChart() {
+  const data = await getDownloadsBySubject();
+  
+  return (
+    <div>
+      <h2>Downloads by Subject</h2>
+      <BarChart width={600} height={400} data={data}>
+        <XAxis dataKey="name" />
+        <YAxis />
+        <Bar dataKey="value" fill="#8884d8" />
+      </BarChart>
+    </div>
+  );
+}
+```
+
+### Recharts Integration
+
+The return format is optimized for Recharts:
+
+```typescript
+import { getDownloadsBySubject } from '@/core/actions/analytics';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+
+async function DownloadsPieChart() {
+  const data = await getDownloadsBySubject();
+  
+  return (
+    <ResponsiveContainer width="100%" height={400}>
+      <PieChart>
+        <Pie
+          data={data}
+          dataKey="value"
+          nameKey="name"
+          cx="50%"
+          cy="50%"
+          outerRadius={80}
+          label
+        >
+          {data.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
+      </PieChart>
+    </ResponsiveContainer>
+  );
+}
+```
+
+---
+
+## getRecentDownloads
+
+Retrieves the most recent download events for activity feeds. **Admin-only function.**
+
+```typescript
+export async function getRecentDownloads(): Promise<Array<{
+  id: string;
+  event_type: string;
+  resource_name: string;
+  subject_name: string;
+  user_id: string | null;
+  created_at: string;
+}>>
+```
+
+### Parameters
+
+None
+
+### Return Values
+
+<ResponseField name="events" type="AnalyticsEvent[]">
+  Array of the 3 most recent download events, ordered by `created_at` descending.
+  
+  Example:
+  ```typescript
+  [
+    {
+      id: "a1b2c3...",
+      event_type: "download",
+      resource_name: "Lecture 5 - Algorithms.pdf",
+      subject_name: "Data Structures",
+      user_id: "user123...",
+      created_at: "2026-03-04T14:32:15.123Z"
+    },
+    { /* ... */ },
+    { /* ... */ }
+  ]
+  ```
+  
+  Returns empty array if no events exist or query fails.
+</ResponseField>
+
+### Behavior
+
+1. **Admin Query**: Uses admin client to bypass RLS
+2. **Filtering**: Only selects events with `event_type = "download"`
+3. **Ordering**: Sorts by `created_at` descending (newest first)
+4. **Limiting**: Returns only the 3 most recent events
+
+### Query Structure
+
+```typescript
+const { data } = await supabase
+  .from("analytics_events")
+  .select("*")
+  .eq("event_type", "download")
+  .order("created_at", { ascending: false })
+  .limit(3);
+```
+
+### Usage Example
+
+```typescript
+import { getRecentDownloads } from '@/core/actions/analytics';
+
+async function RecentActivityFeed() {
+  const events = await getRecentDownloads();
+  
+  return (
+    <div>
+      <h2>Recent Downloads</h2>
+      {events.length === 0 ? (
+        <p>No recent downloads</p>
+      ) : (
+        <ul>
+          {events.map(event => (
+            <li key={event.id}>
+              <strong>{event.resource_name}</strong>
+              {' '}
+              from {event.subject_name}
+              {' '}
+              <time>{new Date(event.created_at).toLocaleString()}</time>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+```
+
+### Formatted Activity Feed
+
+```typescript
+import { getRecentDownloads } from '@/core/actions/analytics';
+
+function formatTimeAgo(date: string): string {
+  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+async function ActivityFeed() {
+  const events = await getRecentDownloads();
+  
+  return (
+    <div className="activity-feed">
+      <h3>Latest Activity</h3>
+      {events.map(event => (
+        <div key={event.id} className="activity-item">
+          <div className="icon">📥</div>
+          <div className="content">
+            <p className="resource">{event.resource_name}</p>
+            <p className="meta">
+              {event.subject_name} • {formatTimeAgo(event.created_at)}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## Database Schema
+
+### analytics_events Table
+
+```sql
+CREATE TABLE analytics_events (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  event_type VARCHAR(50) NOT NULL,  -- 'download', 'view', etc.
+  resource_name TEXT,
+  subject_name TEXT,
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### Indexes for Performance
+
+```sql
+-- Speed up event type filtering
+CREATE INDEX idx_analytics_event_type ON analytics_events(event_type);
+
+-- Speed up recent queries
+CREATE INDEX idx_analytics_created_at ON analytics_events(created_at DESC);
+
+-- Speed up user-specific queries (future feature)
+CREATE INDEX idx_analytics_user ON analytics_events(user_id);
+
+-- Composite index for common query pattern
+CREATE INDEX idx_analytics_type_date ON analytics_events(event_type, created_at DESC);
+```
+
+---
+
+## Admin Dashboard Example
+
+Combining all analytics functions:
+
+```typescript
+import { getDownloadsBySubject, getRecentDownloads } from '@/core/actions/analytics';
+import { BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
+
+async function AnalyticsDashboard() {
+  const [downloadStats, recentActivity] = await Promise.all([
+    getDownloadsBySubject(),
+    getRecentDownloads()
+  ]);
+  
+  const totalDownloads = downloadStats.reduce((sum, item) => sum + item.value, 0);
+  const topSubject = downloadStats[0];
+  
+  return (
+    <div className="dashboard">
+      <h1>Analytics Dashboard</h1>
+      
+      {/* Summary Cards */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <h3>Total Downloads</h3>
+          <p className="stat-value">{totalDownloads}</p>
+        </div>
+        
+        <div className="stat-card">
+          <h3>Top Subject</h3>
+          <p className="stat-value">{topSubject?.name || 'N/A'}</p>
+          <p className="stat-detail">{topSubject?.value || 0} downloads</p>
+        </div>
+        
+        <div className="stat-card">
+          <h3>Active Subjects</h3>
+          <p className="stat-value">{downloadStats.length}</p>
+        </div>
+      </div>
+      
+      {/* Downloads Chart */}
+      <section>
+        <h2>Downloads by Subject</h2>
+        <BarChart width={800} height={400} data={downloadStats}>
+          <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+          <YAxis />
+          <Tooltip />
+          <Bar dataKey="value" fill="#3b82f6" />
+        </BarChart>
+      </section>
+      
+      {/* Recent Activity */}
+      <section>
+        <h2>Recent Activity</h2>
+        <div className="activity-list">
+          {recentActivity.map(event => (
+            <div key={event.id} className="activity-item">
+              <span className="time">
+                {new Date(event.created_at).toLocaleTimeString()}
+              </span>
+              <span className="resource">{event.resource_name}</span>
+              <span className="subject">{event.subject_name}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+```
+
+---
+
+## Future Expansions
+
+### Additional Event Types
+
+The `event_type` field supports future analytics:
+
+```typescript
+// View tracking
+await supabase.from("analytics_events").insert({
+  event_type: "view",
+  resource_name: "Lecture 5",
+  subject_name: "Data Structures",
+  user_id: user.id
+});
+
+// Search tracking
+await supabase.from("analytics_events").insert({
+  event_type: "search",
+  resource_name: query,
+  subject_name: null,
+  user_id: user.id
+});
+```
+
+### Time-based Analytics
+
+```typescript
+export async function getDownloadsByDay(days: number = 7) {
+  const supabase = createAdminClient();
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  
+  const { data } = await supabase
+    .from("analytics_events")
+    .select("created_at")
+    .eq("event_type", "download")
+    .gte("created_at", startDate.toISOString());
+  
+  // Group by day...
+}
+```
+
+### User-specific Analytics
+
+```typescript
+export async function getUserDownloadHistory() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) return [];
+  
+  const { data } = await supabase
+    .from("analytics_events")
+    .select("*")
+    .eq("event_type", "download")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  
+  return data || [];
+}
+```

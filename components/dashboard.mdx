@@ -1,0 +1,714 @@
+---
+title: Dashboard Components
+description: Comprehensive documentation for DIDG System admin dashboard components
+---
+
+# Dashboard Components
+
+The DIDG System dashboard provides a comprehensive suite of components for academic management. All components follow a theme-aware design pattern using CSS variables for light/dark mode support.
+
+## Component Hierarchy
+
+```
+Dashboard
+├── Sidebar (Navigation)
+├── StudentsTable (Student Management)
+├── StudentRegisterForm (Student Registration)
+├── UploadGradesForm (Grade Import)
+├── AdminResourceList (Resource Management)
+│   └── ResourceFormModal
+├── AdminAyudantiaList (Class Session Management)
+│   └── AyudantiaCard
+│       └── AyudantiaForm
+├── MessageActions (Message Interactions)
+├── RecentDownloads (Analytics Widget)
+└── AnalyticsChart (Data Visualization)
+```
+
+---
+
+## Sidebar
+
+Fixed navigation sidebar for the admin dashboard.
+
+**Location:** `~/workspace/source/didg-website/src/components/dashboard/Sidebar.tsx`
+
+### Props
+
+No props - uses `usePathname()` for active state detection.
+
+### Features
+
+- Auto-highlights active route
+- Logout functionality with Supabase auth
+- Hidden on mobile (`hidden md:flex`)
+- Fixed positioning with `pt-16` offset
+
+### Usage Example
+
+```tsx
+import { Sidebar } from "@/components/dashboard/Sidebar";
+
+// In dashboard layout
+export default function DashboardLayout({ children }) {
+  return (
+    <div className="flex">
+      <Sidebar />
+      <main className="flex-1 ml-64">{children}</main>
+    </div>
+  );
+}
+```
+
+### Styling Pattern
+
+```tsx
+// Container
+className="w-64 bg-surface border-r border-text-main/10 h-screen fixed"
+
+// Active link
+className="bg-primary/10 text-primary border border-primary/20"
+
+// Inactive link
+className="text-text-muted hover:text-text-main hover:bg-text-main/5"
+```
+
+---
+
+## StudentsTable
+
+Interactive table for managing student records with inline editing.
+
+**Location:** `~/workspace/source/didg-website/src/components/dashboard/StudentsTable.tsx`
+
+### Props
+
+```typescript
+interface Props {
+  students: any[];
+}
+```
+
+### Features
+
+- Inline edit modal with validation
+- Email/password change confirmation flow
+- Optimistic UI updates
+- Security warning for credential changes
+- Delete functionality with confirmation
+
+### Usage Example
+
+```tsx
+import { StudentsTable } from "@/components/dashboard/StudentsTable";
+import { createClient } from "@/infrastructure/supabase/server";
+
+export default async function StudentsPage() {
+  const supabase = await createClient();
+  const { data: students } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("role", "student")
+    .order("created_at", { ascending: false });
+
+  return <StudentsTable students={students || []} />;
+}
+```
+
+**Reference:** `~/workspace/source/didg-website/src/app/dashboard/students/page.tsx:28`
+
+### State Management
+
+```typescript
+const [editingStudent, setEditingStudent] = useState<any | null>(null);
+const [originalEmail, setOriginalEmail] = useState("");
+const [newPassword, setNewPassword] = useState("");
+const [isLoading, setIsLoading] = useState(false);
+const [showConfirm, setShowConfirm] = useState(false);
+```
+
+### Modal Flow
+
+1. **Edit View** - Standard form for name, RUT, email, password
+2. **Confirmation View** - Security warning when credentials change
+3. **Submit** - Calls `updateStudent()` action
+
+---
+
+## StudentRegisterForm
+
+Form for registering new students with email and RUT-based authentication.
+
+**Location:** `~/workspace/source/didg-website/src/components/dashboard/StudentRegisterForm.tsx`
+
+### Props
+
+No props - self-contained with form actions.
+
+### Features
+
+- Uses `useFormState` and `useFormStatus` for loading states
+- Auto-resets form on success
+- Icon-enhanced inputs
+- Success/error message display
+
+### Usage Example
+
+```tsx
+import { StudentRegisterForm } from "@/components/dashboard/StudentRegisterForm";
+
+export default function StudentsPage() {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="lg:col-span-2">
+        {/* Students list */}
+      </div>
+      <div>
+        <StudentRegisterForm />
+      </div>
+    </div>
+  );
+}
+```
+
+**Reference:** `~/workspace/source/didg-website/src/app/dashboard/students/page.tsx:33`
+
+### Form Fields
+
+```typescript
+// Required fields
+full_name: string;    // Student's full name
+email: string;        // Institutional email
+rut: string;          // Chilean RUT (becomes password)
+```
+
+---
+
+## UploadGradesForm
+
+Bulk grade upload form supporting CSV/Excel files.
+
+**Location:** `~/workspace/source/didg-website/src/components/dashboard/UploadGradesForm.tsx`
+
+### Props
+
+```typescript
+interface Props {
+  subjects: { id: string; name: string; code: string }[];
+  defaultSubjectId?: string;
+}
+```
+
+### Features
+
+- File upload with drag-drop zone
+- Subject selection dropdown
+- Evaluation name input
+- Result display with error list
+- Auto-reset on success
+
+### Usage Example
+
+```tsx
+import { UploadGradesForm } from "@/components/dashboard/UploadGradesForm";
+
+export default async function GradesPage() {
+  const { data: subjects } = await supabase
+    .from("subjects")
+    .select("id, name, code");
+
+  return <UploadGradesForm subjects={subjects || []} />;
+}
+```
+
+### Response Format
+
+```typescript
+interface UploadResult {
+  count: number;        // Successfully inserted grades
+  errors?: string[];    // Array of error messages
+}
+```
+
+---
+
+## AdminResourceList
+
+Searchable, filterable list of educational resources with CRUD operations.
+
+**Location:** `~/workspace/source/didg-website/src/components/dashboard/AdminResourceList.tsx`
+
+### Props
+
+```typescript
+interface Props {
+  resources: any[];
+}
+```
+
+### Features
+
+- Real-time search filtering
+- Category filters (ALL, CODE, TUTORIAL, TOOL)
+- Modal-based create/edit flow
+- Delete with confirmation
+- File vs. link indicators
+
+### Usage Example
+
+```tsx
+import { AdminResourceList } from "@/components/dashboard/AdminResourceList";
+
+export default async function ResourcesPage() {
+  const { data: resources } = await supabase
+    .from("resources")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  return <AdminResourceList resources={resources || []} />;
+}
+```
+
+### State Management
+
+```typescript
+const [searchTerm, setSearchTerm] = useState("");
+const [filterCategory, setFilterCategory] = useState("ALL");
+const [isModalOpen, setIsModalOpen] = useState(false);
+const [editingResource, setEditingResource] = useState<any | null>(null);
+```
+
+---
+
+## ResourceFormModal
+
+Modal form for creating and editing resources.
+
+**Location:** `~/workspace/source/didg-website/src/components/dashboard/ResourceFormModal.tsx`
+
+### Props
+
+```typescript
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  resourceToEdit?: any | null;
+}
+```
+
+### Features
+
+- Create/edit modes
+- File upload or external URL
+- Category selection
+- Tag support (comma-separated)
+- FormData submission
+
+### Usage Example
+
+```tsx
+import { ResourceFormModal } from "@/components/dashboard/ResourceFormModal";
+
+function MyComponent() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [resource, setResource] = useState(null);
+
+  return (
+    <>
+      <button onClick={() => setIsOpen(true)}>New Resource</button>
+      <ResourceFormModal
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        resourceToEdit={resource}
+      />
+    </>
+  );
+}
+```
+
+**Reference:** `~/workspace/source/didg-website/src/components/dashboard/AdminResourceList.tsx:126-130`
+
+### Form Fields
+
+```typescript
+title: string;              // Resource title
+description?: string;       // Optional description
+category: 'CODE' | 'TUTORIAL' | 'TOOL';
+tags?: string[];            // Comma-separated tags
+external_url?: string;      // External link
+file?: File;                // Uploaded file
+```
+
+---
+
+## AdminAyudantiaList
+
+Manage class sessions (ayudantías) with search and type filters.
+
+**Location:** `~/workspace/source/didg-website/src/components/dashboard/AdminAyudantiaList.tsx`
+
+### Props
+
+```typescript
+interface Props {
+  ayudantias: any[];
+  subjectId: string;
+}
+```
+
+### Features
+
+- Search by title/description
+- Filter by PDF/VIDEO
+- Renders `AyudantiaCard` components
+- Empty state handling
+
+### Usage Example
+
+```tsx
+import { AdminAyudantiaList } from "@/components/dashboard/AdminAyudantiaList";
+
+export default async function SubjectPage({ params }) {
+  const { data: ayudantias } = await supabase
+    .from("ayudantias")
+    .select("*")
+    .eq("subject_id", params.subjectId);
+
+  return (
+    <AdminAyudantiaList
+      ayudantias={ayudantias || []}
+      subjectId={params.subjectId}
+    />
+  );
+}
+```
+
+**Reference:** `~/workspace/source/didg-website/src/app/dashboard/courses/[subjectId]/page.tsx:68-71`
+
+---
+
+## AyudantiaCard
+
+Expandable card displaying class session details with edit/delete actions.
+
+**Location:** `~/workspace/source/didg-website/src/components/dashboard/AyudantiaCard.tsx`
+
+### Props
+
+```typescript
+interface Props {
+  ayu: any;           // Ayudantia object
+  subjectId: string;  // Parent subject ID
+}
+```
+
+### Features
+
+- Markdown rendering with syntax highlighting
+- Expandable content with "Ver más" button
+- Badge indicators for PDF/Video
+- Inline edit modal
+- Delete with confirmation
+
+### Usage Example
+
+```tsx
+import { AyudantiaCard } from "@/components/dashboard/AyudantiaCard";
+
+// Typically used within AdminAyudantiaList
+{ayudantias.map((ayu) => (
+  <AyudantiaCard key={ayu.id} ayu={ayu} subjectId={subjectId} />
+))}
+```
+
+**Reference:** `~/workspace/source/didg-website/src/components/dashboard/AdminAyudantiaList.tsx:91-95`
+
+### Markdown Configuration
+
+```typescript
+const markdownComponents = {
+  h1: ({ node, ...props }: any) => (
+    <h4 className="text-base font-bold text-text-main" {...props} />
+  ),
+  code: ({ node, ...props }: any) => (
+    <code className="bg-background/50 px-1 rounded font-mono" {...props} />
+  ),
+  // ... more customizations
+};
+```
+
+---
+
+## AyudantiaForm
+
+Form for creating and editing class sessions.
+
+**Location:** `~/workspace/source/didg-website/src/components/dashboard/AyudantiaForm.tsx`
+
+### Props
+
+```typescript
+interface Props {
+  subjectId: string;
+  initialData?: any;      // For edit mode
+  onCancel?: () => void;  // For modal usage
+}
+```
+
+### Features
+
+- Create/edit modes
+- File upload (PDF/ZIP)
+- Video URL input
+- Date picker with timezone handling
+- Markdown-enabled description
+- Sticky positioning option
+
+### Usage Example
+
+```tsx
+import { AyudantiaForm } from "@/components/dashboard/AyudantiaForm";
+
+// Create mode
+<AyudantiaForm subjectId="subject-uuid" />
+
+// Edit mode
+<AyudantiaForm
+  subjectId="subject-uuid"
+  initialData={ayudantia}
+  onCancel={() => setIsEditing(false)}
+/>
+```
+
+**Reference:** `~/workspace/source/didg-website/src/app/dashboard/courses/[subjectId]/page.tsx:77`
+
+### Form Fields
+
+```typescript
+title: string;              // Session title
+date: string;               // ISO date string
+description?: string;       // Markdown content
+video_url?: string;         // Optional video link
+file?: File;                // Material file
+```
+
+---
+
+## MessageActions
+
+Action button for marking messages as read with optimistic updates.
+
+**Location:** `~/workspace/source/didg-website/src/components/dashboard/MessageActions.tsx`
+
+### Props
+
+```typescript
+interface Props {
+  id: string;      // Message ID
+  isRead: boolean; // Current read status
+}
+```
+
+### Features
+
+- Optimistic UI updates
+- `useTransition` for server actions
+- Auto-hides when read
+- Click event propagation control
+
+### Usage Example
+
+```tsx
+import { MessageActions } from "@/components/dashboard/MessageActions";
+
+{messages.map((msg) => (
+  <div key={msg.id} className="flex items-center justify-between">
+    <span>{msg.content}</span>
+    <MessageActions id={msg.id} isRead={msg.is_read} />
+  </div>
+))}
+```
+
+### States
+
+```typescript
+// Unread state
+<button className="text-primary bg-primary/10 border-primary/20">
+  <Check /> Marcar Visto
+</button>
+
+// Read state
+<div className="text-emerald-500 bg-emerald-500/10">
+  <CheckCheck /> Visto
+</div>
+```
+
+---
+
+## RecentDownloads
+
+Real-time activity feed widget showing recent resource downloads.
+
+**Location:** `~/workspace/source/didg-website/src/components/dashboard/RecentDownloads.tsx`
+
+### Props
+
+```typescript
+interface DownloadEvent {
+  id: string;
+  resource_name: string;
+  subject_name: string;
+  created_at: string;  // ISO timestamp
+}
+
+interface Props {
+  data: DownloadEvent[];
+}
+```
+
+### Features
+
+- Relative time formatting ("Hace 10 min")
+- Hover effects on items
+- Empty state illustration
+- Scrollable container
+
+### Usage Example
+
+```tsx
+import { RecentDownloads } from "@/components/dashboard/RecentDownloads";
+
+export default async function DashboardPage() {
+  const { data: downloads } = await supabase
+    .from("download_events")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  return (
+    <div className="grid grid-cols-2 gap-6">
+      <RecentDownloads data={downloads || []} />
+    </div>
+  );
+}
+```
+
+### Time Formatting Logic
+
+```typescript
+const formatTimeAgo = (dateString: string) => {
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diffInSeconds < 60) return "Hace un momento";
+  if (diffInSeconds < 3600) return `Hace ${Math.floor(diffInSeconds / 60)} min`;
+  if (diffInSeconds < 86400) return `Hace ${Math.floor(diffInSeconds / 3600)} h`;
+  return date.toLocaleDateString();
+};
+```
+
+---
+
+## AnalyticsChart
+
+Bar chart visualization for download analytics using Recharts.
+
+**Location:** `~/workspace/source/didg-website/src/components/dashboard/AnalyticsChart.tsx`
+
+### Props
+
+```typescript
+interface Props {
+  data: { name: string; value: number }[];
+}
+```
+
+### Features
+
+- Displays top 6 items + "Otros" category
+- Auto-sorts by value
+- Theme-aware colors using CSS variables
+- Responsive container
+- Tooltip with custom styling
+
+### Usage Example
+
+```tsx
+import { AnalyticsChart } from "@/components/dashboard/AnalyticsChart";
+
+export default async function DashboardPage() {
+  const { data: stats } = await supabase.rpc("get_download_stats");
+
+  return (
+    <div className="bg-surface border border-text-main/10 rounded-xl p-6">
+      <h3 className="text-lg font-bold mb-4">Descargas por Recurso</h3>
+      <AnalyticsChart data={stats || []} />
+    </div>
+  );
+}
+```
+
+### Data Processing
+
+```typescript
+const processData = () => {
+  const sortedData = [...data].sort((a, b) => b.value - a.value);
+  const topItems = sortedData.slice(0, MAX_ITEMS);
+  const otherItems = sortedData.slice(MAX_ITEMS);
+  const otherValue = otherItems.reduce((sum, item) => sum + item.value, 0);
+
+  if (otherValue > 0) {
+    topItems.push({ name: "Otros", value: otherValue });
+  }
+
+  return topItems;
+};
+```
+
+---
+
+## Theme & Styling
+
+All dashboard components use CSS variables for theming:
+
+```css
+/* Light mode */
+--background: white;
+--surface: #f9fafb;
+--text-main: #111827;
+--text-muted: #6b7280;
+--primary: #3b82f6;
+
+/* Dark mode */
+--background: #0a0a0a;
+--surface: #1a1a1a;
+--text-main: #ffffff;
+--text-muted: #a1a1aa;
+--primary: #60a5fa;
+```
+
+### Common Patterns
+
+```tsx
+// Card container
+className="bg-surface/50 border border-text-main/10 rounded-xl"
+
+// Input field
+className="bg-background/50 border border-text-main/10 text-text-main"
+
+// Modal backdrop
+className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+
+// Primary button
+className="bg-primary text-background hover:opacity-90"
+```
+
+---
+
+## Dark Mode Support
+
+All components automatically adapt to theme changes via:
+
+1. **CSS Variables** - Dynamic color tokens
+2. **Tailwind Classes** - `bg-surface`, `text-text-main`, etc.
+3. **ThemeProvider** - From `next-themes`
+
+No manual dark mode classes needed - the design system handles it automatically.

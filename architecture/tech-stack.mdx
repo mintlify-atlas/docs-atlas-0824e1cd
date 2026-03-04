@@ -1,0 +1,438 @@
+---
+title: Technology Stack
+description: Comprehensive technology stack and dependencies used in the DIDG System
+---
+
+## Overview
+
+The DIDG System is built with modern web technologies, prioritizing developer experience, type safety, and performance. The stack is carefully curated to provide a robust foundation for an academic management platform.
+
+## Core Framework
+
+### Next.js 14.1.0
+
+The application is built on **Next.js 14**, utilizing the App Router architecture.
+
+**Key Features Used:**
+- **App Router**: File-system based routing with layouts
+- **React Server Components**: Server-side rendering by default
+- **Server Actions**: Type-safe mutations without API routes
+- **Streaming SSR**: Progressive page rendering
+- **Image Optimization**: Automatic image optimization
+- **Font Optimization**: Automatic font optimization with Google Fonts
+
+**Configuration** (`package.json:26`):
+```json
+"next": "14.1.0"
+```
+
+<Note>
+Next.js 14 introduced stable Server Actions, which are heavily utilized throughout the DIDG System for all data mutations.
+</Note>
+
+### React 18
+
+**React 18** provides the foundation for the UI layer with concurrent rendering features.
+
+**Dependencies** (`package.json:28-29`):
+```json
+"react": "^18",
+"react-dom": "^18"
+```
+
+### TypeScript 5
+
+Full **TypeScript** coverage ensures type safety across the entire codebase.
+
+**Configuration** (`package.json:51`):
+```json
+"typescript": "^5"
+```
+
+**Type Generation**: Database types are auto-generated from Supabase schema (`src/types/supabase.ts`).
+
+## Styling & UI
+
+### Tailwind CSS 3.4
+
+Utility-first CSS framework for rapid UI development.
+
+**Dependencies** (`package.json:50`):
+```json
+"tailwindcss": "^3.4.1",
+"autoprefixer": "^10.4.17",
+"postcss": "^8.4.35"
+```
+
+**Utilities** (`package.json:35`):
+```json
+"tailwind-merge": "^2.2.1"
+```
+
+The `tailwind-merge` package is used for conditional class merging (see `src/core/utils/cn.ts`).
+
+### Shadcn/ui Components
+
+The UI is built with **Shadcn/ui**, a collection of re-usable components built with Radix UI and Tailwind CSS.
+
+**Base Components** (`src/components/ui/`):
+- Card components
+- Breadcrumbs
+- Theme toggle
+- Custom UI components
+
+**Radix UI Primitives** (`package.json:13-15`):
+```json
+"@radix-ui/react-dialog": "^1.0.5",
+"@radix-ui/react-dropdown-menu": "^2.0.6",
+"@radix-ui/react-slot": "^1.0.2"
+```
+
+### Icons
+
+**Lucide React** (`package.json:25`):
+```json
+"lucide-react": "^0.562.0"
+```
+
+Provides a comprehensive icon library with tree-shaking support.
+
+### Fonts
+
+Multiple Google Fonts for typography hierarchy (`src/app/layout.tsx:2`):
+
+```typescript
+import { Inter, JetBrains_Mono, Orbitron } from "next/font/google";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains" });
+const orbitron = Orbitron({ subsets: ["latin"], variable: "--font-orbitron" });
+```
+
+- **Inter**: Body text and UI
+- **JetBrains Mono**: Code and monospace text
+- **Orbitron**: Headings and accent text
+
+### Animation
+
+**Framer Motion** (`package.json:23`):
+```json
+"framer-motion": "^11.0.3"
+```
+
+Provides smooth animations and transitions throughout the UI.
+
+**Canvas Confetti** (`package.json:19`):
+```json
+"canvas-confetti": "^1.9.4"
+```
+
+Used for celebratory effects (likely in grade submission or achievement features).
+
+### Theming
+
+**Next Themes** (`package.json:27`):
+```json
+"next-themes": "^0.4.6"
+```
+
+Provides dark/light theme support with system preference detection (`src/app/layout.tsx:39`).
+
+## Backend & Database
+
+### Supabase
+
+Supabase provides the entire backend infrastructure.
+
+**Dependencies** (`package.json:16-17`):
+```json
+"@supabase/ssr": "^0.1.0",
+"@supabase/supabase-js": "^2.39.3"
+```
+
+**Supabase CLI** (dev dependency) (`package.json:49`):
+```json
+"supabase": "^2.71.0"
+```
+
+**Services Used:**
+
+1. **PostgreSQL Database**: Primary data storage
+2. **Authentication**: User management with RLS
+3. **Storage**: File storage for course materials (`src/core/actions/ayudantias.ts:34`)
+4. **Row Level Security**: Fine-grained access control
+
+**Client Architecture:**
+
+- **Browser Client** (`src/infrastructure/supabase/client.ts:4`): For client-side operations
+- **Server Client** (`src/infrastructure/supabase/server.ts:6`): For server-side operations with cookies
+- **Admin Client** (`src/infrastructure/supabase/admin.ts:5`): For operations requiring elevated privileges
+
+### Database
+
+**PostgreSQL** (via Supabase) with the following features:
+
+- Auto-generated TypeScript types
+- Foreign key constraints with CASCADE deletes
+- Row Level Security policies
+- Triggers and functions
+
+See [Database Schema](/architecture/database-schema) for detailed schema documentation.
+
+## External APIs
+
+### Telegram Bot API
+
+Integrated for 2FA notifications and system alerts.
+
+**Implementation** (`src/core/lib/telegram.ts:5`):
+```typescript
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const BASE_URL = `https://api.telegram.org/bot${BOT_TOKEN}`;
+```
+
+**Use Cases:**
+- 2FA code delivery (`src/core/actions/auth-2fa.ts:98`)
+- Student registration notifications (`src/core/actions/students.ts:73`)
+- System alerts and monitoring
+
+## State Management
+
+### React Context API
+
+Lightweight state management for UI preferences.
+
+**Example** (`src/context/FloatingUIContext.tsx:10`):
+```typescript
+const FloatingUIContext = createContext<FloatingUIContextType | undefined>(undefined);
+```
+
+Used for managing UI visibility state across the application.
+
+### Zustand
+
+Lightweight state management for complex client-side state.
+
+**Dependency** (`package.json:38`):
+```json
+"zustand": "^4.5.0"
+```
+
+Provides a simple, unopinionated state management solution with hooks.
+
+<Note>
+The application primarily relies on server state (via Supabase) and URL state (via Next.js routing), using client state sparingly for UI-only concerns.
+</Note>
+
+## Forms & Validation
+
+### React Hook Form
+
+Form state management and validation.
+
+**Dependency** (`package.json:30`):
+```json
+"react-hook-form": "^7.50.0"
+```
+
+**Resolver** (`package.json:12`):
+```json
+"@hookform/resolvers": "^5.2.2"
+```
+
+### Zod
+
+Schema validation and type inference.
+
+**Dependency** (`package.json:37`):
+```json
+"zod": "^3.22.4"
+```
+
+**Example Usage** (`src/core/actions/academic.ts:7-14`):
+```typescript
+const SemesterSchema = z.object({
+  name: z.string().min(4, "Ej: 2025-1"),
+});
+
+const SubjectSchema = z.object({
+  name: z.string().min(3),
+  code: z.string().min(3),
+  semester_id: z.string().uuid(),
+});
+```
+
+Zod provides runtime validation and automatic TypeScript type inference for all form inputs and server action parameters.
+
+## File Processing
+
+### XLSX/Excel Processing
+
+For grade upload functionality.
+
+**Dependencies** (`package.json:36`):
+```json
+"xlsx": "^0.18.5"
+```
+
+**Implementation** (`src/core/actions/grades-upload.ts:36-39`):
+```typescript
+const workbook = XLSX.read(buffer, { type: "buffer" });
+const sheetName = workbook.SheetNames[0];
+const worksheet = workbook.Sheets[sheetName];
+const rows: any[] = XLSX.utils.sheet_to_json(worksheet);
+```
+
+### ZIP File Handling
+
+**Dependency** (`package.json:24`):
+```json
+"jszip": "^3.10.1"
+```
+
+Used for bulk file downloads and resource packaging.
+
+## Content Rendering
+
+### Markdown Support
+
+**React Markdown** (`package.json:31`):
+```json
+"react-markdown": "^10.1.0"
+```
+
+**Plugins** (`package.json:33-34`):
+```json
+"rehype-raw": "^7.0.0",
+"remark-gfm": "^4.0.1"
+```
+
+- `remark-gfm`: GitHub Flavored Markdown support
+- `rehype-raw`: HTML in Markdown support
+
+Enables rich content in course descriptions, project documentation, and resource descriptions.
+
+## Data Visualization
+
+### Recharts
+
+**Dependency** (`package.json:32`):
+```json
+"recharts": "^3.6.0"
+```
+
+Provides charts and graphs for analytics dashboards (likely for grade statistics and course metrics).
+
+## Command Palette
+
+### CMDK
+
+**Dependency** (`package.json:21`):
+```json
+"cmdk": "^1.1.1"
+```
+
+Implements the command menu for quick navigation (`src/app/layout.tsx:8`):
+```typescript
+import { CommandMenu } from "@/components/layout/CommandMenu";
+```
+
+## Utilities
+
+### Date Handling
+
+**date-fns** (`package.json:22`):
+```json
+"date-fns": "^4.1.0"
+```
+
+Modern date utility library for formatting and manipulation.
+
+### Class Name Utilities
+
+**clsx** (`package.json:20`):
+```json
+"clsx": "^2.1.0"
+```
+
+Conditional class name construction, often used with `tailwind-merge` in the `cn()` utility.
+
+## Analytics & Monitoring
+
+### Vercel Analytics
+
+**Dependency** (`package.json:18`):
+```json
+"@vercel/analytics": "^1.6.1"
+```
+
+**Integration** (`src/app/layout.tsx:12,66`):
+```typescript
+import { Analytics } from "@vercel/analytics/react";
+// ...
+<Analytics />
+```
+
+Provides web analytics for user behavior tracking and performance monitoring.
+
+## Development Tools
+
+### Type Definitions
+
+**Dev Dependencies** (`package.json:41-44`):
+```json
+"@types/canvas-confetti": "^1.9.0",
+"@types/node": "^20",
+"@types/react": "^18",
+"@types/react-dom": "^18"
+```
+
+### Linting
+
+**ESLint** with Next.js config (`package.json:46-47`):
+```json
+"eslint": "^8",
+"eslint-config-next": "14.1.0"
+```
+
+## Environment Variables
+
+The application requires the following environment variables:
+
+```bash
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Telegram
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+
+# Application
+NEXT_PUBLIC_SITE_URL=
+```
+
+<Note type="warning">
+**Security**: The `SUPABASE_SERVICE_ROLE_KEY` should never be exposed to the client. It is only used in server-side code (Server Actions and Server Components).
+</Note>
+
+## Runtime
+
+**Node.js**: Version 20 (inferred from type definitions)
+
+**Package Manager**: npm or pnpm (package-lock.json or pnpm-lock.yaml)
+
+## Build Output
+
+The application builds to:
+- **Serverless Functions**: For Server Actions and dynamic routes
+- **Static Pages**: For pages that can be pre-rendered
+- **Edge Functions**: For middleware and auth
+
+## Related Documentation
+
+- [Architecture Overview](/architecture/overview) - System architecture
+- [Database Schema](/architecture/database-schema) - Database structure
+- [Security](/architecture/security) - Security implementation

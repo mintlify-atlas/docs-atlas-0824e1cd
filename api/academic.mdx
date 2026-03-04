@@ -1,0 +1,498 @@
+---
+title: 'Academic Management API'
+description: 'Server actions for managing semesters, subjects, and ayudantías (teaching assistant sessions)'
+---
+
+## Overview
+
+The Academic API provides CRUD operations for the academic hierarchy:
+- **Semesters**: Academic periods (e.g., "2025-1")
+- **Subjects**: Courses within semesters
+- **Ayudantías**: Individual teaching assistant sessions with materials and videos
+
+All functions use Zod for input validation and Next.js cache revalidation.
+
+---
+
+## Semesters
+
+### createSemester
+
+Creates a new academic semester.
+
+```typescript
+export async function createSemester(formData: FormData): Promise<void>
+```
+
+#### Parameters
+
+<ParamField body="formData" type="FormData" required>
+  <ParamField body="name" type="string" required>
+    Semester name (minimum 4 characters, e.g., "2025-1")
+  </ParamField>
+</ParamField>
+
+#### Validation Schema
+
+```typescript
+const SemesterSchema = z.object({
+  name: z.string().min(4, "Ej: 2025-1"),
+});
+```
+
+#### Behavior
+
+1. Validates semester name with Zod
+2. Inserts semester with `is_active: true` by default
+3. Revalidates `/dashboard/courses` path
+4. Throws error if validation or insertion fails
+
+#### Usage Example
+
+```typescript
+import { createSemester } from '@/core/actions/academic';
+
+function CreateSemesterForm() {
+  return (
+    <form action={createSemester}>
+      <input name="name" placeholder="2025-1" required />
+      <button type="submit">Create Semester</button>
+    </form>
+  );
+}
+```
+
+#### Error Cases
+
+- Throws `"Nombre de semestre inválido"` if name is less than 4 characters
+- Throws database error message if insertion fails
+
+---
+
+### toggleSemesterStatus
+
+Toggles the active status of a semester.
+
+```typescript
+export async function toggleSemesterStatus(
+  id: string,
+  currentStatus: boolean
+): Promise<void>
+```
+
+#### Parameters
+
+<ParamField body="id" type="string" required>
+  UUID of the semester
+</ParamField>
+
+<ParamField body="currentStatus" type="boolean" required>
+  Current `is_active` status (will be inverted)
+</ParamField>
+
+#### Behavior
+
+1. Updates `is_active` to opposite of `currentStatus`
+2. Revalidates `/dashboard/courses` path
+
+#### Usage Example
+
+```typescript
+import { toggleSemesterStatus } from '@/core/actions/academic';
+
+function SemesterToggle({ semester }: Props) {
+  return (
+    <form action={() => toggleSemesterStatus(semester.id, semester.is_active)}>
+      <button type="submit">
+        {semester.is_active ? 'Deactivate' : 'Activate'}
+      </button>
+    </form>
+  );
+}
+```
+
+---
+
+## Subjects
+
+### createSubject
+
+Creates a new subject within a semester.
+
+```typescript
+export async function createSubject(formData: FormData): Promise<void>
+```
+
+#### Parameters
+
+<ParamField body="formData" type="FormData" required>
+  <ParamField body="name" type="string" required>
+    Subject name (minimum 3 characters)
+  </ParamField>
+  
+  <ParamField body="code" type="string" required>
+    Subject code (minimum 3 characters, e.g., "CS101")
+  </ParamField>
+  
+  <ParamField body="semester_id" type="string" required>
+    UUID of the parent semester
+  </ParamField>
+</ParamField>
+
+#### Validation Schema
+
+```typescript
+const SubjectSchema = z.object({
+  name: z.string().min(3),
+  code: z.string().min(3),
+  semester_id: z.string().uuid(),
+});
+```
+
+#### Behavior
+
+1. Validates input with Zod
+2. Inserts subject into `subjects` table
+3. Revalidates `/dashboard/courses` path
+4. Throws error if validation or insertion fails
+
+#### Usage Example
+
+```typescript
+import { createSubject } from '@/core/actions/academic';
+
+function CreateSubjectForm({ semesterId }: Props) {
+  return (
+    <form action={createSubject}>
+      <input type="hidden" name="semester_id" value={semesterId} />
+      <input name="name" placeholder="Algorithms" required />
+      <input name="code" placeholder="CS101" required />
+      <button type="submit">Create Subject</button>
+    </form>
+  );
+}
+```
+
+#### Error Cases
+
+- Throws `"Datos de asignatura inválidos"` if validation fails
+- Throws database error message if insertion fails
+
+---
+
+### deleteSubject
+
+Deletes a subject and all associated ayudantías (cascade delete).
+
+```typescript
+export async function deleteSubject(subjectId: string): Promise<void>
+```
+
+#### Parameters
+
+<ParamField body="subjectId" type="string" required>
+  UUID of the subject to delete
+</ParamField>
+
+#### Behavior
+
+1. Deletes subject from `subjects` table
+2. Cascade deletes related ayudantías and enrollments (if configured with `ON DELETE CASCADE`)
+3. Revalidates `/dashboard/courses` path
+4. Throws error if deletion fails
+
+#### Usage Example
+
+```typescript
+import { deleteSubject } from '@/core/actions/academic';
+
+function DeleteSubjectButton({ subjectId }: Props) {
+  return (
+    <form action={() => deleteSubject(subjectId)}>
+      <button type="submit">Delete Subject</button>
+    </form>
+  );
+}
+```
+
+#### Error Cases
+
+- Throws `"Error al eliminar asignatura: {message}"` with database error details
+
+---
+
+## Ayudantías (TA Sessions)
+
+### createAyudantia
+
+Creates a new ayudantía with optional file upload and video URL.
+
+```typescript
+export async function createAyudantia(formData: FormData): Promise<void>
+```
+
+#### Parameters
+
+<ParamField body="formData" type="FormData" required>
+  <ParamField body="title" type="string" required>
+    Title of the ayudantía (minimum 3 characters)
+  </ParamField>
+  
+  <ParamField body="description" type="string">
+    Optional description
+  </ParamField>
+  
+  <ParamField body="date" type="string" required>
+    Date in ISO format
+  </ParamField>
+  
+  <ParamField body="subject_id" type="string" required>
+    UUID of the parent subject
+  </ParamField>
+  
+  <ParamField body="video_url" type="string">
+    Optional URL to video recording (must be valid URL or empty string)
+  </ParamField>
+  
+  <ParamField body="file" type="File">
+    Optional file upload (PDF, slides, etc.)
+  </ParamField>
+</ParamField>
+
+#### Validation Schema
+
+```typescript
+const AyudantiaSchema = z.object({
+  title: z.string().min(3),
+  description: z.string().optional(),
+  date: z.string(),
+  subject_id: z.string().uuid(),
+  video_url: z.string().url().optional().or(z.literal("")),
+});
+```
+
+#### Behavior
+
+1. Validates input data with Zod
+2. If file provided:
+   - Uploads to `course-materials` storage bucket
+   - Path format: `{subject_id}/{timestamp}_{filename}`
+3. Inserts ayudantía with `material_url` pointing to uploaded file
+4. Revalidates `/dashboard/courses/{subject_id}` path
+5. Throws error if validation, upload, or insertion fails
+
+#### Storage Structure
+
+Files are stored in the `course-materials` bucket:
+```
+course-materials/
+  ├── {subject_id}/
+  │   ├── 1709571234567_lecture_notes.pdf
+  │   └── 1709571234568_slides.pptx
+```
+
+#### Usage Example
+
+```typescript
+import { createAyudantia } from '@/core/actions/ayudantias';
+
+function CreateAyudantiaForm({ subjectId }: Props) {
+  return (
+    <form action={createAyudantia}>
+      <input type="hidden" name="subject_id" value={subjectId} />
+      <input name="title" placeholder="Session 1: Introduction" required />
+      <textarea name="description" />
+      <input name="date" type="date" required />
+      <input name="video_url" type="url" placeholder="https://youtube.com/..." />
+      <input name="file" type="file" />
+      <button type="submit">Create Ayudantía</button>
+    </form>
+  );
+}
+```
+
+#### Error Cases
+
+- Throws `"Datos inválidos"` if validation fails
+- Throws `"Error subiendo archivo"` if file upload fails
+- Throws database error message if insertion fails
+
+---
+
+### updateAyudantia
+
+Updates an existing ayudantía. If a new file is uploaded, replaces the old file.
+
+```typescript
+export async function updateAyudantia(
+  id: string,
+  formData: FormData
+): Promise<void>
+```
+
+#### Parameters
+
+<ParamField body="id" type="string" required>
+  UUID of the ayudantía to update
+</ParamField>
+
+<ParamField body="formData" type="FormData" required>
+  Same fields as `createAyudantia`
+</ParamField>
+
+#### Behavior
+
+1. Validates input data with Zod
+2. If new file provided:
+   - Retrieves old `material_url`
+   - Uploads new file to storage
+   - Deletes old file from storage
+   - Updates `material_url` in database
+3. Updates all other fields
+4. Sets `updated_at` timestamp
+5. Revalidates `/dashboard/courses/{subject_id}` path
+
+#### File Replacement Logic
+
+```typescript
+if (file && file.size > 0) {
+  // Get old file path
+  const { data: oldData } = await supabase
+    .from("ayudantias")
+    .select("material_url")
+    .eq("id", id)
+    .single();
+  
+  // Upload new file
+  const filePath = `${subject_id}/${Date.now()}_${file.name}`;
+  await supabase.storage.from("course-materials").upload(filePath, file);
+  
+  // Delete old file
+  if (oldData?.material_url) {
+    await supabase.storage.from("course-materials").remove([oldData.material_url]);
+  }
+}
+```
+
+#### Usage Example
+
+```typescript
+import { updateAyudantia } from '@/core/actions/ayudantias';
+
+function EditAyudantiaForm({ ayudantia }: Props) {
+  return (
+    <form action={(formData) => updateAyudantia(ayudantia.id, formData)}>
+      <input name="subject_id" type="hidden" value={ayudantia.subject_id} />
+      <input name="title" defaultValue={ayudantia.title} required />
+      <textarea name="description" defaultValue={ayudantia.description} />
+      <input name="date" type="date" defaultValue={ayudantia.date} required />
+      <input name="video_url" type="url" defaultValue={ayudantia.video_url} />
+      <input name="file" type="file" />
+      <button type="submit">Update</button>
+    </form>
+  );
+}
+```
+
+#### Error Cases
+
+- Throws `"Datos inválidos"` if validation fails
+- Throws `"Error al subir nuevo archivo"` if file upload fails
+- Throws database error message if update fails
+
+---
+
+### deleteAyudantia
+
+Deletes an ayudantía and its associated storage file.
+
+```typescript
+export async function deleteAyudantia(
+  id: string,
+  subjectId: string
+): Promise<void>
+```
+
+#### Parameters
+
+<ParamField body="id" type="string" required>
+  UUID of the ayudantía to delete
+</ParamField>
+
+<ParamField body="subjectId" type="string" required>
+  UUID of the parent subject (for path revalidation)
+</ParamField>
+
+#### Behavior
+
+1. Retrieves `material_url` before deletion
+2. Deletes ayudantía from database
+3. If file exists, deletes from storage bucket
+4. Revalidates `/dashboard/courses/{subjectId}` path
+
+#### Usage Example
+
+```typescript
+import { deleteAyudantia } from '@/core/actions/ayudantias';
+
+function DeleteButton({ ayudantia }: Props) {
+  return (
+    <form action={() => deleteAyudantia(ayudantia.id, ayudantia.subject_id)}>
+      <button type="submit">Delete</button>
+    </form>
+  );
+}
+```
+
+---
+
+### getSignedUrl
+
+Generates a temporary signed URL for downloading a course material file.
+
+```typescript
+export async function getSignedUrl(filePath: string): Promise<string>
+```
+
+#### Parameters
+
+<ParamField body="filePath" type="string" required>
+  Path to file in `course-materials` bucket (stored in `material_url`)
+</ParamField>
+
+#### Return Values
+
+<ResponseField name="signedUrl" type="string">
+  Temporary signed URL valid for 60 seconds
+</ResponseField>
+
+#### Behavior
+
+1. Requests signed URL from Supabase Storage
+2. URL expires after 60 seconds
+3. Throws error if signing fails
+
+#### Security
+
+- URLs are short-lived (60 seconds)
+- Prevents direct bucket access
+- Requires authentication to call this function
+
+#### Usage Example
+
+```typescript
+import { getSignedUrl } from '@/core/actions/ayudantias';
+
+async function downloadMaterial(filePath: string) {
+  try {
+    const url = await getSignedUrl(filePath);
+    window.open(url, '_blank');
+  } catch (error) {
+    console.error('Download failed:', error);
+  }
+}
+```
+
+#### Error Cases
+
+- Throws `"No se pudo generar el enlace de descarga"` if URL signing fails

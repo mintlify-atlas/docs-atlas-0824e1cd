@@ -1,0 +1,502 @@
+---
+title: 'Admin Guide'
+description: 'Complete guide for administrators managing the DIDG academic platform'
+icon: 'shield-check'
+---
+
+## Admin Dashboard Overview
+
+The DIDG admin dashboard provides comprehensive tools for managing students, courses, grades, resources, and communication. This guide covers all administrative features.
+
+## Logging In with 2FA
+
+### Two-Factor Authentication Process
+
+Administrators must use 2FA for enhanced security.
+
+<Steps>
+  <Step title="Enter Email and Password">
+    Navigate to the login page and enter your admin credentials.
+  </Step>
+  
+  <Step title="Initiate 2FA Request">
+    The system detects your admin role (via `profiles.role = 'admin'`) and triggers the 2FA flow.
+    
+    **What happens:**
+    - A 6-digit code is generated
+    - Code is stored in `verification_codes` table with 5-minute expiration
+    - Telegram message is sent with the code
+    - Your session is logged out (must verify to proceed)
+  </Step>
+  
+  <Step title="Retrieve Code from Telegram">
+    Check your configured Telegram chat for a message containing:
+    - Your email address
+    - Role indicator (👑 ADMIN)
+    - 6-digit verification code
+    - Timestamp
+  </Step>
+  
+  <Step title="Enter Verification Code">
+    Input the 6-digit code in the verification form.
+  </Step>
+  
+  <Step title="Complete Login">
+    Upon successful verification:
+    - Code is deleted from database
+    - Session is established
+    - Redirect to `/dashboard`
+  </Step>
+</Steps>
+
+<Note>
+  **Security Features:**
+  - Codes expire after 5 minutes
+  - Rate limiting prevents brute-force attempts (429 error after too many tries)
+  - Students bypass 2FA (automatic redirect after password validation)
+</Note>
+
+<Tip>
+  If you receive a 2FA code you didn't request, your account may be compromised. Change your password immediately.
+</Tip>
+
+## Dashboard Home
+
+### Main Dashboard (`/dashboard/page.tsx`)
+
+The dashboard home displays key metrics and analytics:
+
+**KPI Cards:**
+
+1. **Proyectos Publicados**
+   - Icon: `Code2`
+   - Count from `projects` table
+   - Color: Primary
+
+2. **Ayudantías Activas**
+   - Icon: `BookOpen`
+   - Count from `ayudantias` table
+   - Color: Secondary
+
+3. **Estudiantes Registrados**
+   - Icon: `Users`
+   - Count from `profiles` where `role = 'student'`
+   - Color: Emerald
+
+**Analytics Section:**
+
+- **Activity Chart** (left, 2/3 width)
+  - Component: `AnalyticsChart`
+  - Data source: `getDownloadsBySubject()`
+  - Shows most requested resources by subject
+
+- **Recent Downloads Feed** (right, 1/3 width)
+  - Component: `RecentDownloads`
+  - Data source: `getRecentDownloads()`
+  - Real-time feed of student downloads
+
+<Note>
+  The dashboard uses server-side rendering with data fetched at build time. Metrics update on page refresh.
+</Note>
+
+## Managing Students
+
+### Student Management Page (`/dashboard/students`)
+
+This page provides a complete interface for registering and managing students.
+
+**Layout:**
+- Left column (2/3): `StudentsTable` component
+- Right column (1/3): `StudentRegisterForm` component
+
+### Registering New Students
+
+<Steps>
+  <Step title="Navigate to Students Page">
+    Click "Estudiantes" in the sidebar or go to `/dashboard/students`.
+  </Step>
+  
+  <Step title="Fill Registration Form">
+    In the right panel, enter:
+    - **Full Name**: Student's complete name
+    - **RUT**: Chilean national ID (validated format)
+    - **Email**: Institutional or personal email
+    - **Password**: Initial password (student should change later)
+  </Step>
+  
+  <Step title="Submit Form">
+    The `StudentRegisterForm` component:
+    - Creates a Supabase Auth user
+    - Inserts a profile record with `role = 'student'`
+    - Displays success/error message
+  </Step>
+</Steps>
+
+<Tip>
+  Use a consistent email format (e.g., `rut@university.cl`) to simplify student onboarding.
+</Tip>
+
+### Viewing Student List
+
+The `StudentsTable` displays:
+- RUT
+- Full Name
+- Email
+- Registration date
+- Actions (edit, delete)
+
+**Table Features:**
+- Sortable columns
+- Search functionality
+- Pagination (if implemented)
+
+<Accordion title="How to delete a student">
+  1. Locate the student in the table
+  2. Click the delete icon (Trash2)
+  3. Confirm the action
+  4. System deletes:
+     - Profile record
+     - Auth user (if cascade delete is configured)
+     - Associated enrollments (check cascade rules)
+</Accordion>
+
+## Managing Courses and Ayudantías
+
+*For detailed course management workflows, see the [Course Management Guide](/guides/course-management).*
+
+### Quick Overview
+
+**Courses Dashboard** (`/dashboard/courses`):
+- Create semesters
+- Add subjects to semesters
+- Toggle semester active/archived status
+- Navigate to subject-specific ayudantía management
+
+**Ayudantía Management** (`/dashboard/courses/[subjectId]`):
+- Upload new ayudantía sessions
+- Edit existing sessions
+- Delete sessions
+- Filter by type (PDF, video)
+
+## Uploading Grades
+
+### Grades Upload Interface (`/dashboard/grades`)
+
+The grades page allows bulk uploading of student evaluations via CSV/Excel files.
+
+<Steps>
+  <Step title="Navigate to Grades Center">
+    Click "Centro de Calificaciones" or go to `/dashboard/grades`.
+  </Step>
+  
+  <Step title="Select Subject">
+    Use the dropdown in `UploadGradesForm` to choose the subject.
+    
+    **Note:** You can also arrive here directly from a subject card by clicking "Notas" (links to `/dashboard/grades?subject_id=[id]`).
+  </Step>
+  
+  <Step title="Enter Evaluation Name">
+    Provide a name for the evaluation (e.g., "Certamen 1", "Tarea 2").
+  </Step>
+  
+  <Step title="Prepare CSV/Excel File">
+    Your file should include columns:
+    - `rut`: Student's RUT
+    - `score`: Numerical grade (e.g., 5.5, 4.0)
+    - Optional: `weight` for weighted averages
+  </Step>
+  
+  <Step title="Upload File">
+    Drag and drop or click to select your file (accepts `.csv`, `.xlsx`, `.xls`).
+  </Step>
+  
+  <Step title="Process and Review">
+    The `uploadGrades` action:
+    - Parses the file
+    - Matches RUTs to enrolled students
+    - Inserts grade records into `grades` table
+    - Returns a summary with:
+      - Total inserted count
+      - List of errors (mismatched RUTs, invalid data)
+  </Step>
+</Steps>
+
+### Understanding the Upload Results
+
+**Success Indicators:**
+- Green checkmark icon (`CheckCircle`)
+- "Se insertaron X notas correctamente"
+- Grades appear in the right-hand history panel
+
+**Error Handling:**
+- Red alert icon (`AlertCircle`)
+- List of specific errors (e.g., "RUT No encontrado", "Invalid score")
+- Partial success: Some grades may insert even if others fail
+
+<Note>
+  The history panel on the right shows the 50 most recent grades for the selected subject, including:
+  - Student RUT and name
+  - Evaluation name
+  - Score (color-coded: green ≥ 4.0, red < 4.0)
+</Note>
+
+<Tip>
+  Always review the error log after uploading. Common issues include:
+  - Students not enrolled in the subject
+  - Typos in RUT formatting
+  - Missing required columns
+</Tip>
+
+## Managing Resources
+
+*For detailed resource management workflows, see the [Resource Management Guide](/guides/resource-management).*
+
+### Quick Overview
+
+**Resources Page** (`/dashboard/resources`):
+- Component: `AdminResourceList`
+- Features:
+  - Search by title or tag
+  - Filter by category (CODE, TUTORIAL, TOOL)
+  - Create new resources
+  - Edit/delete existing resources
+
+**Resource Types:**
+- **File Upload**: PDFs, ZIPs stored in Supabase Storage
+- **External Links**: URLs to tools, documentation, tutorials
+
+## Viewing and Responding to Messages
+
+### Messages Inbox (`/dashboard/messages`)
+
+Students and visitors can contact you via the contact form. All messages appear here.
+
+**Message Display:**
+- Unread messages shown first (sorted by `is_read ASC`)
+- Unread indicators: primary border color, pulsing dot
+- Read messages: muted colors, lower opacity
+
+**Message Information:**
+- Subject line
+- Sender name and email
+- Message body (preserves formatting)
+- Timestamp (formatted in Spanish locale)
+
+### Managing Messages
+
+<Steps>
+  <Step title="Navigate to Messages">
+    Click "Mensajes" in the sidebar or go to `/dashboard/messages`.
+  </Step>
+  
+  <Step title="Review Unread Messages">
+    Unread messages appear at the top with visual indicators.
+  </Step>
+  
+  <Step title="Mark as Read">
+    The `MessageActions` component provides a button to toggle read status.
+    
+    **Action:** Updates `messages.is_read` field in database.
+  </Step>
+  
+  <Step title="Respond to Sender">
+    Copy the sender's email and respond via your email client. (Direct reply functionality may be added in future updates.)
+  </Step>
+</Steps>
+
+<Tip>
+  Check messages daily to ensure timely responses to student inquiries.
+</Tip>
+
+## Sidebar Navigation
+
+The admin sidebar (`/components/dashboard/Sidebar.tsx`) provides access to all management areas:
+
+**Menu Items:**
+
+1. **Resumen** (`/dashboard`)
+   - Icon: `LayoutDashboard`
+   - Main dashboard with KPIs and analytics
+
+2. **Mensajes** (`/dashboard/messages`)
+   - Icon: `MessageSquare`
+   - Student messages and contact form submissions
+
+3. **Estudiantes** (`/dashboard/students`)
+   - Icon: `Users`
+   - Student registration and management
+
+4. **Proyectos** (`/dashboard/projects`)
+   - Icon: `FolderKanban`
+   - Portfolio projects (create, edit, delete)
+
+5. **Ayudantías** (`/dashboard/courses`)
+   - Icon: `GraduationCap`
+   - Course and ayudantía management
+
+6. **Recursos** (`/dashboard/resources`)
+   - Icon: `FolderKanban`
+   - Resource library management
+
+7. **Configuración** (`/dashboard/settings`)
+   - Icon: `Settings`
+   - System settings (theme, profile, etc.)
+
+**Footer:**
+- **Cerrar Sesión**: Logout button (calls `supabase.auth.signOut()`)
+
+<Note>
+  Active menu items are highlighted with primary color and a subtle border. Hover states provide visual feedback.
+</Note>
+
+## Admin Workflow Examples
+
+### Starting a New Semester
+
+<Steps>
+  <Step title="Create Semester">
+    Go to `/dashboard/courses` and use the "Nuevo Semestre" form to create a semester (e.g., "2025-1").
+  </Step>
+  
+  <Step title="Add Subjects">
+    For each subject in the semester:
+    - Click "Añadir Asignatura"
+    - Enter name and code
+    - Click "Crear"
+  </Step>
+  
+  <Step title="Enroll Students">
+    *(If enrollment management is implemented)*
+    Link students to subjects via the enrollment interface.
+  </Step>
+  
+  <Step title="Upload Initial Materials">
+    Navigate to each subject and upload ayudantía sessions as they occur.
+  </Step>
+</Steps>
+
+### Publishing Grades After an Exam
+
+<Steps>
+  <Step title="Prepare Grade File">
+    Export grades from your gradebook as CSV with columns: `rut`, `score`.
+  </Step>
+  
+  <Step title="Navigate to Grades Center">
+    Go to `/dashboard/grades` and select the subject.
+  </Step>
+  
+  <Step title="Upload and Verify">
+    Upload the file, enter the evaluation name, and review the results.
+  </Step>
+  
+  <Step title="Notify Students">
+    *(Optional)* Send an announcement that grades are available.
+  </Step>
+</Steps>
+
+## Analytics and Insights
+
+### Download Analytics
+
+The `AnalyticsChart` component visualizes resource usage:
+- **X-axis**: Subjects
+- **Y-axis**: Download count
+- **Data source**: `getDownloadsBySubject()`
+
+**Use Cases:**
+- Identify which materials are most valuable
+- Detect subjects with low engagement
+- Plan resource updates based on demand
+
+### Recent Activity Feed
+
+The `RecentDownloads` component shows:
+- Student name/RUT
+- Downloaded resource
+- Timestamp
+
+**Use Cases:**
+- Monitor real-time platform usage
+- Identify peak activity periods
+- Verify students are accessing materials
+
+<Tip>
+  Use analytics to inform decisions about which content to expand or update.
+</Tip>
+
+## Best Practices
+
+<Tip>
+  **Regular Backups**: Ensure database backups are scheduled. Critical tables: `profiles`, `subjects`, `ayudantias`, `grades`.
+</Tip>
+
+<Tip>
+  **Consistent Naming**: Use standard naming conventions for evaluations (e.g., "C1", "C2" for exams, "T1", "T2" for homework).
+</Tip>
+
+<Tip>
+  **Upload Materials Early**: Post ayudantía materials shortly after sessions to maximize student access.
+</Tip>
+
+<Tip>
+  **Monitor Messages**: Check the messages inbox daily to respond to student questions promptly.
+</Tip>
+
+<Tip>
+  **Archive Old Semesters**: Use the "Archivar" button to hide past semesters from public view while preserving data.
+</Tip>
+
+## Troubleshooting
+
+<Accordion title="2FA code not received">
+  **Possible Causes:**
+  - Telegram bot misconfiguration
+  - Network issue
+  - Rate limiting
+  
+  **Solution:**
+  - Verify Telegram bot token and chat ID in environment variables
+  - Check `sendTelegramMessage` function logs
+  - Wait 60 seconds if rate-limited, then retry
+</Accordion>
+
+<Accordion title="Grades upload fails">
+  **Possible Causes:**
+  - Invalid CSV format
+  - Students not enrolled in subject
+  - RUT mismatch
+  
+  **Solution:**
+  - Review error messages in the upload result
+  - Verify enrollment records in `enrollments` table
+  - Check RUT formatting (no dots, with dash)
+</Accordion>
+
+<Accordion title="Can't delete a subject">
+  **Possible Causes:**
+  - Foreign key constraints (ayudantías linked to subject)
+  - Database permissions
+  
+  **Solution:**
+  - Delete all ayudantías for the subject first
+  - Or use cascade delete if configured in database schema
+</Accordion>
+
+## Security Considerations
+
+<Note>
+  **Admin Access Control:**
+  - Never share admin credentials
+  - Regularly rotate passwords
+  - Monitor 2FA logs for suspicious activity
+  - Use HTTPS in production
+</Note>
+
+<Note>
+  **Data Privacy:**
+  - Student data (RUT, email, grades) is sensitive
+  - Comply with local data protection regulations
+  - Limit export/download of student information
+  - Use row-level security (RLS) in Supabase
+</Note>

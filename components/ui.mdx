@@ -1,0 +1,873 @@
+---
+title: UI Components
+description: Shared UI components and utilities for the DIDG System
+---
+
+# UI Components
+
+The DIDG System includes a collection of reusable UI components that provide consistent styling, interaction patterns, and theme support across the application.
+
+## Component Overview
+
+```
+UI Components
+├── Card System (Base components)
+│   ├── Card
+│   ├── CardHeader
+│   ├── CardTitle
+│   └── CardContent
+├── Navigation
+│   ├── Breadcrumbs
+│   └── CommandMenu
+├── Theme Controls
+│   ├── ThemeToggle
+│   └── HideUIToggle
+├── Tools
+│   └── GradeSimulator
+└── Interactive
+    └── CharmanderPet
+```
+
+---
+
+## Card System
+
+Flexible card components with theme-aware styling.
+
+**Location:** `~/workspace/source/didg-website/src/components/ui/card.tsx`
+
+### Components
+
+#### Card
+
+Base container with rounded corners and subtle border.
+
+```typescript
+const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        "rounded-xl border border-text-main/10 bg-surface/50 text-text-main shadow-sm backdrop-blur-sm",
+        className
+      )}
+      {...props}
+    />
+  )
+);
+```
+
+#### CardHeader
+
+```typescript
+const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn("flex flex-col space-y-1.5 p-6", className)} {...props} />
+  )
+);
+```
+
+#### CardTitle
+
+```typescript
+const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
+  ({ className, ...props }, ref) => (
+    <h3
+      ref={ref}
+      className={cn(
+        "font-display text-lg font-semibold leading-none tracking-tight text-text-main",
+        className
+      )}
+      {...props}
+    />
+  )
+);
+```
+
+#### CardContent
+
+```typescript
+const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+  )
+);
+```
+
+### Usage Example
+
+```tsx
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+
+export function StatsCard({ title, value, icon }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          {icon}
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-3xl font-bold">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+### Customization
+
+```tsx
+// Override background
+<Card className="bg-gradient-to-br from-primary/10 to-secondary/10">
+
+// Add hover effect
+<Card className="hover:border-primary/40 transition-colors cursor-pointer">
+
+// Remove padding
+<CardContent className="p-0">
+```
+
+---
+
+## Breadcrumbs
+
+Navigational breadcrumb trail with home icon.
+
+**Location:** `~/workspace/source/didg-website/src/components/ui/Breadcrumbs.tsx`
+
+### Props
+
+```typescript
+interface BreadcrumbItem {
+  label: string;   // Display text
+  href?: string;   // Optional link (last item typically has no href)
+}
+
+interface Props {
+  items: BreadcrumbItem[];
+  className?: string;
+}
+```
+
+### Features
+
+- **Home Icon** - Always links to `/`
+- **ChevronRight Separators** - Visual hierarchy
+- **Active State** - Last item highlighted
+- **Hover Effects** - Smooth color transitions
+- **Truncation** - Long labels truncate on mobile
+
+### Usage Example
+
+```tsx
+import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
+
+export default function SubjectPage({ subject }) {
+  return (
+    <div>
+      <Breadcrumbs
+        items={[
+          { label: "Cursos", href: "/courses" },
+          { label: subject.name }, // No href = current page
+        ]}
+      />
+      {/* Page content */}
+    </div>
+  );
+}
+```
+
+**Reference:** `~/workspace/source/didg-website/src/app/courses/[subjectId]/page.tsx:54-59`
+
+### Styling
+
+```tsx
+// Container
+<nav className="flex items-center text-sm text-text-muted mb-6">
+
+// Home link
+<Link className="hover:text-primary transition-colors">
+  <Home className="w-4 h-4" />
+</Link>
+
+// Separator
+<ChevronRight className="w-4 h-4 mx-2 opacity-50" />
+
+// Intermediate link
+<Link className="hover:text-text-main transition-colors">
+  {item.label}
+</Link>
+
+// Current page (no link)
+<span className="text-text-main font-semibold truncate max-w-[200px] md:max-w-none">
+  {item.label}
+</span>
+```
+
+---
+
+## CommandMenu
+
+Keyboard-driven command palette (Cmd+K / Ctrl+K).
+
+**Location:** `~/workspace/source/didg-website/src/components/layout/CommandMenu.tsx`
+
+### Features
+
+- **Keyboard Shortcut** - `Ctrl/Cmd + K` to open
+- **Fuzzy Search** - Filter commands by typing
+- **Navigation** - Quick access to all pages
+- **Actions** - Copy email, copy URL, theme switching
+- **Social Links** - GitHub, LinkedIn
+- **Mobile Button** - Floating action button on mobile
+
+### Usage Example
+
+```tsx
+import { CommandMenu } from "@/components/layout/CommandMenu";
+
+// In root layout
+export default function Layout({ children }) {
+  return (
+    <html>
+      <body>
+        {children}
+        <CommandMenu />
+      </body>
+    </html>
+  );
+}
+```
+
+### Command Groups
+
+```typescript
+// Pages
+{ icon: Home, label: "Inicio", action: () => router.push("/") }
+{ icon: Code2, label: "Proyectos", action: () => router.push("/projects") }
+{ icon: GraduationCap, label: "Ayudantías", action: () => router.push("/courses") }
+
+// Social
+{ icon: Github, label: "GitHub", action: () => window.open("...") }
+{ icon: Linkedin, label: "LinkedIn", action: () => window.open("...") }
+
+// General
+{ icon: Copy, label: "Copiar Email", action: () => copyToClipboard("...") }
+{ icon: Moon, label: "Modo Oscuro", action: () => setTheme("dark") }
+{ icon: Sun, label: "Modo Claro", action: () => setTheme("light") }
+{ icon: Laptop, label: "Sistema", action: () => setTheme("system") }
+```
+
+### Mobile Button
+
+```tsx
+// Floating button (mobile only)
+<button
+  onClick={() => setOpen(true)}
+  className={cn(
+    "md:hidden fixed bottom-36 right-4 z-[50] flex h-12 w-12 items-center justify-center rounded-full bg-surface text-text-main shadow-[0_0_15px_rgba(0,0,0,0.2)]",
+    isVisible
+      ? "opacity-100 translate-y-0 scale-100"
+      : "opacity-0 translate-y-32 scale-50 pointer-events-none"
+  )}
+>
+  <CommandIcon className="w-5 h-5" />
+</button>
+```
+
+### Modal Structure
+
+```tsx
+// Overlay
+<div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={close} />
+
+  {/* Command palette */}
+  <Command className="relative w-full max-w-lg bg-surface rounded-xl border border-text-main/10 shadow-2xl">
+    {/* Search input */}
+    <Command.Input placeholder="¿Qué necesitas?..." />
+
+    {/* Results */}
+    <Command.List>
+      <Command.Empty>Nada por aquí...</Command.Empty>
+      <Command.Group heading="Páginas">{/* Items */}</Command.Group>
+    </Command.List>
+
+    {/* Footer */}
+    <div className="border-t border-text-main/10 px-4 py-2">
+      <span>DIDG SYSTEM v1.0</span>
+    </div>
+  </Command>
+</div>
+```
+
+---
+
+## ThemeToggle
+
+Floating button for switching between light/dark modes.
+
+**Location:** `~/workspace/source/didg-website/src/components/ui/ThemeToggle.tsx`
+
+### Features
+
+- **Sun/Moon Icons** - Visual theme indicator
+- **Smooth Transitions** - Rotate animations
+- **Fixed Position** - Bottom-right corner
+- **Glow Effect** - Primary color shadow on hover
+
+### Usage Example
+
+```tsx
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
+
+// In root layout
+export default function Layout({ children }) {
+  return (
+    <html>
+      <body>
+        {children}
+        <ThemeToggle />
+      </body>
+    </html>
+  );
+}
+```
+
+### Implementation
+
+```tsx
+import { useTheme } from "next-themes";
+import { Moon, Sun } from "lucide-react";
+
+export function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null; // Avoid hydration mismatch
+
+  return (
+    <button
+      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      className="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-surface border border-primary/20 shadow-[0_0_15px_rgba(0,0,0,0.2)] hover:shadow-[0_0_20px_var(--primary)]"
+    >
+      <Sun className="h-6 w-6 text-orange-500 rotate-0 scale-100 dark:-rotate-90 dark:scale-0" />
+      <Moon className="h-6 w-6 text-primary rotate-90 scale-0 dark:rotate-0 dark:scale-100" />
+    </button>
+  );
+}
+```
+
+### Styling Pattern
+
+```css
+/* Base button */
+position: fixed;
+bottom: 1.5rem;
+right: 1.5rem;
+z-index: 50;
+
+/* Icons transition */
+.icon {
+  transition: transform 0.3s, opacity 0.3s;
+}
+
+/* Light mode (sun visible) */
+.light .sun { transform: rotate(0deg) scale(1); }
+.light .moon { transform: rotate(90deg) scale(0); }
+
+/* Dark mode (moon visible) */
+.dark .sun { transform: rotate(-90deg) scale(0); }
+.dark .moon { transform: rotate(0deg) scale(1); }
+```
+
+---
+
+## HideUIToggle
+
+Toggle visibility of floating UI elements on mobile.
+
+**Location:** `~/workspace/source/didg-website/src/components/ui/HideUIToggle.tsx`
+
+### Features
+
+- **Mobile Only** - Hidden on desktop (`md:hidden`)
+- **Context Integration** - Uses `FloatingUIContext`
+- **Eye Icons** - Show/hide visual indicator
+- **Bottom Positioning** - Lower than CommandMenu button
+
+### Usage Example
+
+```tsx
+import { HideUIToggle } from "@/components/ui/HideUIToggle";
+
+// In layout with FloatingUIProvider
+export default function Layout({ children }) {
+  return (
+    <FloatingUIProvider>
+      {children}
+      <HideUIToggle />
+      <CommandMenu />
+      <ThemeToggle />
+    </FloatingUIProvider>
+  );
+}
+```
+
+### Context Usage
+
+```tsx
+import { useFloatingUI } from "@/context/FloatingUIContext";
+
+export function HideUIToggle() {
+  const { isVisible, toggleVisibility } = useFloatingUI();
+
+  return (
+    <button
+      onClick={toggleVisibility}
+      className={cn(
+        "md:hidden fixed bottom-4 right-4 z-[60] flex h-12 w-12 items-center justify-center rounded-full",
+        isVisible
+          ? "bg-surface text-text-muted"
+          : "bg-primary/10 text-primary border-primary/20"
+      )}
+    >
+      {isVisible ? <Eye /> : <EyeOff />}
+    </button>
+  );
+}
+```
+
+---
+
+## GradeSimulator
+
+Interactive calculator for simulating final grades.
+
+**Location:** `~/workspace/source/didg-website/src/components/tools/GradeSimulator.tsx`
+
+### Features
+
+- **Dynamic Evaluations** - Add/remove items
+- **Weight Management** - Percentage-based weighting
+- **Target Grade** - Calculate required score
+- **Partial Average** - Current standing
+- **Visual Feedback** - Color-coded results
+
+### Usage Example
+
+```tsx
+import { GradeSimulator } from "@/components/tools/GradeSimulator";
+
+export default function GradesPage() {
+  return (
+    <div className="min-h-screen py-12 px-4">
+      <h1>Simulador de Notas</h1>
+      <GradeSimulator />
+    </div>
+  );
+}
+```
+
+### Data Structure
+
+```typescript
+interface GradeItem {
+  id: string;
+  name: string;       // Evaluation name
+  weight: number;     // Percentage (0-100)
+  grade: number | null; // Score (1.0-7.0)
+}
+```
+
+### State Management
+
+```typescript
+const [grades, setGrades] = useState<GradeItem[]>([
+  { id: "1", name: "Certamen 1", weight: 25, grade: null },
+  { id: "2", name: "Certamen 2", weight: 25, grade: null },
+  { id: "3", name: "Tareas", weight: 20, grade: null },
+]);
+
+const [targetGrade, setTargetGrade] = useState(4.0);
+const [needed, setNeeded] = useState<number | null>(null);
+const [currentAverage, setCurrentAverage] = useState<number | null>(null);
+```
+
+### Calculation Logic
+
+```typescript
+useEffect(() => {
+  let totalWeightedScore = 0;
+  let totalWeightUsed = 0;
+
+  // Calculate current average
+  grades.forEach((g) => {
+    if (g.grade !== null) {
+      totalWeightedScore += g.grade * (g.weight / 100);
+      totalWeightUsed += g.weight;
+    }
+  });
+
+  if (totalWeightUsed > 0) {
+    setCurrentAverage(parseFloat((totalWeightedScore / (totalWeightUsed / 100)).toFixed(1)));
+  }
+
+  // Calculate needed grade
+  const totalDefinedWeight = grades.reduce((sum, g) => sum + g.weight, 0);
+  if (totalDefinedWeight < 100) {
+    const remaining = 100 - totalDefinedWeight;
+    const scoreNeeded = (targetGrade - totalWeightedScore) / (remaining / 100);
+    setNeeded(parseFloat(scoreNeeded.toFixed(1)));
+  }
+}, [grades, targetGrade]);
+```
+
+### Result Display
+
+```tsx
+// Color-coded feedback
+<div
+  className={`p-4 rounded-xl text-center ${
+    needed && needed > 7.0
+      ? "bg-red-500/10 border-red-500/30"
+      : needed && needed <= 4.0
+      ? "bg-emerald-500/10 border-emerald-500/30"
+      : "bg-indigo-500/10 border-indigo-500/30"
+  }`}
+>
+  <p>Para aprobar con {targetGrade} necesitas:</p>
+  <span
+    className={`text-4xl font-bold ${
+      needed > 7.0
+        ? "text-red-500"
+        : needed > 5.5
+        ? "text-orange-500"
+        : "text-emerald-500"
+    }`}
+  >
+    {needed}
+  </span>
+  {needed > 7.0 && <p>💀 F, soldado.</p>}
+</div>
+```
+
+---
+
+## CharmanderPet
+
+Interactive pixel art pet with idle, sleeping, and attacking states.
+
+**Location:** `~/workspace/source/didg-website/src/components/home/CharmanderPet.tsx`
+
+### Features
+
+- **State Machine** - Idle → Sleeping → Attacking
+- **User Activity Detection** - Wakes on interaction
+- **Footer Awareness** - Moves up when footer visible
+- **Click Interaction** - Attack animation on click
+- **Responsive Sizing** - Adapts to screen size
+
+### Usage Example
+
+```tsx
+import { CharmanderPet } from "@/components/home/CharmanderPet";
+
+export default function HomePage() {
+  return (
+    <div>
+      <CharmanderPet />
+      {/* Page content */}
+    </div>
+  );
+}
+```
+
+**Reference:** `~/workspace/source/didg-website/src/app/courses/[subjectId]/page.tsx:51`
+
+### Configuration
+
+```typescript
+const AFK_TIME = 120000; // 2 minutes until sleep
+const ATTACK_DURATION = 1600; // Attack animation length
+const BASE_BOTTOM = 16; // Base distance from bottom
+
+const SPRITES = {
+  idle: "/assets/idle.gif",
+  sleeping: "/assets/sleep.gif",
+  attacking: "/assets/attack.gif",
+};
+```
+
+### State Logic
+
+```typescript
+const [status, setStatus] = useState<"idle" | "sleeping" | "attacking">("idle");
+const [bottomOffset, setBottomOffset] = useState(BASE_BOTTOM);
+
+// Activity detection
+useEffect(() => {
+  const handleActivity = () => {
+    if (statusRef.current === "sleeping") setStatus("idle");
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    timerRef.current = setTimeout(() => {
+      if (statusRef.current !== "attacking") setStatus("sleeping");
+    }, AFK_TIME);
+  };
+
+  window.addEventListener("mousemove", handleActivity);
+  window.addEventListener("keydown", handleActivity);
+  // ... more events
+}, []);
+
+// Click interaction
+const handleClick = () => {
+  if (statusRef.current === "attacking") return;
+  setStatus("attacking");
+  setTimeout(() => setStatus("idle"), ATTACK_DURATION);
+};
+```
+
+### Footer Collision Detection
+
+```typescript
+useEffect(() => {
+  const handleScrollPosition = () => {
+    const footer = document.querySelector("footer");
+    if (footer) {
+      const footerRect = footer.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
+
+      if (footerRect.top < windowHeight) {
+        const overlap = windowHeight - footerRect.top;
+        setBottomOffset(BASE_BOTTOM + overlap);
+      } else {
+        setBottomOffset(BASE_BOTTOM);
+      }
+    }
+  };
+
+  window.addEventListener("scroll", handleScrollPosition);
+  window.addEventListener("resize", handleScrollPosition);
+}, []);
+```
+
+### Rendering
+
+```tsx
+<div
+  className="fixed left-2 md:left-4 z-40 cursor-pointer hover:scale-110 active:scale-95"
+  style={{ bottom: `${bottomOffset}px` }}
+  onClick={handleClick}
+>
+  {/* Sleep bubble */}
+  {status === "sleeping" && (
+    <div className="absolute -top-4 right-0 animate-bounce text-[10px] font-mono text-white bg-black/60 px-1.5 py-0.5 rounded-full">
+      Zzz...
+    </div>
+  )}
+
+  {/* Sprite */}
+  <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20">
+    <img
+      src={SPRITES[status]}
+      alt="Charmander"
+      style={{ imageRendering: "pixelated" }}
+      draggable={false}
+    />
+  </div>
+
+  {/* Fire effect */}
+  {status === "attacking" && (
+    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 md:w-16 h-4 bg-orange-500/40 blur-lg rounded-full animate-pulse" />
+  )}
+</div>
+```
+
+---
+
+## Utility: cn()
+
+Conditional className utility for merging Tailwind classes.
+
+**Location:** `~/workspace/source/didg-website/src/core/utils/cn.ts`
+
+### Usage
+
+```tsx
+import { cn } from "@/core/utils/cn";
+
+// Merge base and conditional classes
+<div
+  className={cn(
+    "base-class",
+    condition && "conditional-class",
+    isActive ? "active-class" : "inactive-class",
+    className // User override
+  )}
+/>
+```
+
+### Examples
+
+```tsx
+// Button variants
+className={cn(
+  "px-4 py-2 rounded",
+  variant === "primary" && "bg-primary text-background",
+  variant === "secondary" && "bg-secondary text-white",
+  isLoading && "opacity-50 pointer-events-none"
+)}
+
+// Responsive sizing
+className={cn(
+  "w-full",
+  size === "sm" && "h-8 text-sm",
+  size === "md" && "h-10 text-base",
+  size === "lg" && "h-12 text-lg"
+)}
+```
+
+---
+
+## Theme Integration
+
+### CSS Variables
+
+All UI components use theme-aware variables:
+
+```css
+:root {
+  --background: 255 255 255;
+  --surface: 249 250 251;
+  --text-main: 17 24 39;
+  --text-muted: 107 114 128;
+  --primary: 59 130 246;
+  --secondary: 236 72 153;
+}
+
+.dark {
+  --background: 10 10 10;
+  --surface: 26 26 26;
+  --text-main: 255 255 255;
+  --text-muted: 161 161 170;
+  --primary: 96 165 250;
+  --secondary: 244 114 182;
+}
+```
+
+### Usage in Components
+
+```tsx
+// Background colors
+className="bg-background"        // Page background
+className="bg-surface"           // Card/elevated surfaces
+className="bg-surface/50"        // Semi-transparent
+
+// Text colors
+className="text-text-main"       // Primary text
+className="text-text-muted"      // Secondary text
+className="text-primary"         // Accent color
+
+// Borders
+className="border-text-main/10"  // Subtle borders
+className="border-primary/20"    // Accent borders
+```
+
+---
+
+## Animation Patterns
+
+### Fade In
+
+```tsx
+className="animate-in fade-in duration-200"
+```
+
+### Slide In
+
+```tsx
+className="animate-in slide-in-from-right-4 duration-500"
+className="animate-in slide-in-from-left-2 duration-300"
+```
+
+### Zoom In
+
+```tsx
+className="animate-in zoom-in-95 duration-200"
+```
+
+### Scale on Hover
+
+```tsx
+className="hover:scale-110 transition-transform duration-300"
+className="active:scale-95" // Click feedback
+```
+
+---
+
+## Accessibility
+
+### Focus Visible
+
+```tsx
+className="focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+```
+
+### ARIA Labels
+
+```tsx
+<button aria-label="Cambiar tema">
+  <Moon />
+</button>
+
+<nav aria-label="Breadcrumb">
+  {/* Breadcrumbs */}
+</nav>
+```
+
+### Keyboard Navigation
+
+```tsx
+// Command menu
+React.useEffect(() => {
+  const down = (e: KeyboardEvent) => {
+    if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      setOpen(true);
+    }
+  };
+  document.addEventListener("keydown", down);
+}, []);
+```
+
+---
+
+## Responsive Design
+
+### Breakpoint Usage
+
+```tsx
+// Mobile-first
+className="text-sm md:text-base lg:text-lg"
+
+// Show/hide
+className="hidden md:block"      // Desktop only
+className="md:hidden"            // Mobile only
+
+// Layout changes
+className="flex-col md:flex-row"
+className="grid-cols-1 lg:grid-cols-3"
+```
+
+### Touch Targets
+
+```tsx
+// Minimum 44x44px tap targets
+className="h-12 w-12"            // Mobile buttons
+className="p-2 md:p-3"           // Responsive padding
+```

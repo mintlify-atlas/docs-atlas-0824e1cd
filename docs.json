@@ -1,122 +1,109 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "DIDG System",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#00f0ff",
+    "light": "#00f0ff",
+    "dark": "#00e5ff"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "https://media.brand.dev/6676dd94-10c6-4ecf-9ea1-e6de91457f6c.svg",
+  "logo": {
+    "light": "https://media.brand.dev/6676dd94-10c6-4ecf-9ea1-e6de91457f6c.svg",
+    "dark": "https://media.brand.dev/6676dd94-10c6-4ecf-9ea1-e6de91457f6c.svg"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/Charmandiox9/DIDG_Website"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Charmandiox9/DIDG_Website"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Features",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "features/authentication",
+              "features/academic-management",
+              "features/resource-library",
+              "features/tools"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "User Guides",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "guides/student-guide",
+              "guides/admin-guide",
+              "guides/course-management",
+              "guides/resource-management"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Architecture",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "architecture/overview",
+              "architecture/tech-stack",
+              "architecture/database-schema",
+              "architecture/security"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Developer Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Setup",
             "pages": [
-              "api-reference/introduction"
+              "development/environment-setup",
+              "development/configuration",
+              "development/running-locally"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Server Actions",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/authentication",
+              "api/academic",
+              "api/resources",
+              "api/bookmarks",
+              "api/analytics"
+            ]
+          },
+          {
+            "group": "Components",
+            "pages": [
+              "components/dashboard",
+              "components/courses",
+              "components/ui"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/overview",
+              "deployment/environment-variables",
+              "deployment/supabase-setup"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

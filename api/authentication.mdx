@@ -1,0 +1,336 @@
+---
+title: 'Authentication API'
+description: 'Server actions for user authentication, login, 2FA verification, and password management'
+---
+
+## Overview
+
+The DIDG System uses a two-tier authentication flow:
+- **Students**: Direct email/password login
+- **Admins**: Email/password with mandatory 2FA verification via Telegram
+
+All authentication functions are server actions that interact with Supabase Auth.
+
+---
+
+## initiateLogin
+
+Initiates the login process. For students, this completes authentication. For admins, it triggers 2FA verification.
+
+```typescript
+export async function initiateLogin(
+  prevState: any, 
+  formData: FormData
+): Promise<{
+  error?: string;
+  step?: "verify_2fa";
+  email?: string;
+  password?: string;
+}>
+```
+
+### Parameters
+
+<ParamField body="formData" type="FormData" required>
+  Form data containing authentication credentials
+  
+  <ParamField body="email" type="string" required>
+    User's email address
+  </ParamField>
+  
+  <ParamField body="password" type="string" required>
+    User's password
+  </ParamField>
+</ParamField>
+
+<ParamField body="prevState" type="any">
+  Previous form state (used with React useFormState hook)
+</ParamField>
+
+### Return Values
+
+<ResponseField name="error" type="string">
+  Error message if authentication fails. Possible values:
+  - `"Credenciales incorrectas"` - Invalid credentials
+  - `"⚠️ Demasiados intentos. Por favor espera 60 segundos."` - Rate limit exceeded (429)
+  - `"Error de conexión con el servicio de autenticación."` - Network/service error
+  - `"Error de seguridad (DB)."` - Database error saving verification code
+</ResponseField>
+
+<ResponseField name="step" type="'verify_2fa'">
+  Returned for admin users to indicate 2FA verification is required
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email (returned with 2FA step)
+</ResponseField>
+
+<ResponseField name="password" type="string">
+  User's password (returned with 2FA step for completion)
+</ResponseField>
+
+### Behavior
+
+1. **Credential Validation**: Attempts sign-in with Supabase Auth
+2. **Role Detection**: Queries `profiles` table for user role
+3. **Student Flow**: Redirects to `/dashboard` immediately
+4. **Admin Flow**: 
+   - Signs out the user
+   - Generates 6-digit verification code
+   - Stores code in `verification_codes` table (5 min expiry)
+   - Sends code via Telegram
+   - Returns `step: "verify_2fa"` state
+
+### Error Handling
+
+- **Rate Limiting**: Catches 429 errors from Supabase Auth (60-second cooldown)
+- **Network Errors**: Catches and returns connection errors
+- **Database Errors**: Returns security error if code storage fails
+
+### Usage Example
+
+```typescript
+import { initiateLogin } from '@/core/actions/auth-2fa';
+import { useFormState } from 'react-dom';
+
+function LoginForm() {
+  const [state, formAction] = useFormState(initiateLogin, {});
+  
+  return (
+    <form action={formAction}>
+      <input name="email" type="email" required />
+      <input name="password" type="password" required />
+      {state.error && <p className="error">{state.error}</p>}
+      {state.step === "verify_2fa" && <TwoFactorInput />}
+      <button type="submit">Login</button>
+    </form>
+  );
+}
+```
+
+---
+
+## completeLogin
+
+Completes the 2FA authentication flow for admin users by verifying the code sent via Telegram.
+
+```typescript
+export async function completeLogin(
+  prevState: any,
+  formData: FormData
+): Promise<{
+  error?: string;
+  step?: "verify_2fa";
+  email?: string;
+  password?: string;
+}>
+```
+
+### Parameters
+
+<ParamField body="formData" type="FormData" required>
+  Form data containing 2FA verification details
+  
+  <ParamField body="email" type="string" required>
+    User's email address
+  </ParamField>
+  
+  <ParamField body="password" type="string" required>
+    User's password
+  </ParamField>
+  
+  <ParamField body="code" type="string" required>
+    6-digit verification code from Telegram
+  </ParamField>
+</ParamField>
+
+### Return Values
+
+<ResponseField name="error" type="string">
+  Error message if verification fails:
+  - `"Código inválido"` - Code does not match
+  - `"El código ha expirado"` - Code older than 5 minutes
+  - `"Demasiados intentos. Espera unos segundos e intenta de nuevo."` - Rate limit on final sign-in
+  - `"Error al iniciar sesión."` - General authentication error
+  - `"Error de conexión."` - Network error
+</ResponseField>
+
+<ResponseField name="step" type="'verify_2fa'">
+  Returned on error to maintain 2FA verification state
+</ResponseField>
+
+### Behavior
+
+1. **Code Validation**: Queries `verification_codes` table for matching code
+2. **Expiry Check**: Verifies code is less than 5 minutes old
+3. **Code Deletion**: Removes used code from database
+4. **Final Sign-In**: Completes authentication with Supabase
+5. **Redirect**: Navigates to `/dashboard` on success
+
+### Usage Example
+
+```typescript
+import { completeLogin } from '@/core/actions/auth-2fa';
+
+function TwoFactorForm({ email, password }: Props) {
+  const [state, formAction] = useFormState(completeLogin, {});
+  
+  return (
+    <form action={formAction}>
+      <input type="hidden" name="email" value={email} />
+      <input type="hidden" name="password" value={password} />
+      <input name="code" type="text" maxLength={6} required />
+      {state.error && <p>{state.error}</p>}
+      <button type="submit">Verify</button>
+    </form>
+  );
+}
+```
+
+---
+
+## signOut
+
+Signs out the current user and redirects to the login page.
+
+```typescript
+export async function signOutAction(): Promise<void>
+```
+
+### Parameters
+
+None
+
+### Return Values
+
+This function does not return - it performs a redirect.
+
+### Behavior
+
+1. Signs out user via Supabase Auth
+2. Revalidates root layout cache
+3. Redirects to `/` (login page)
+
+### Usage Example
+
+```typescript
+import { signOutAction } from '@/core/actions/auth';
+
+function LogoutButton() {
+  return (
+    <form action={signOutAction}>
+      <button type="submit">Sign Out</button>
+    </form>
+  );
+}
+```
+
+---
+
+## changePassword
+
+Changes the password for the currently authenticated user after verifying their current password.
+
+```typescript
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<{
+  error?: string;
+  success?: boolean;
+}>
+```
+
+### Parameters
+
+<ParamField body="currentPassword" type="string" required>
+  The user's current password for verification
+</ParamField>
+
+<ParamField body="newPassword" type="string" required>
+  The new password to set
+</ParamField>
+
+### Return Values
+
+<ResponseField name="error" type="string">
+  Error message if password change fails:
+  - `"No hay sesión activa."` - User not authenticated
+  - `"La contraseña actual no es correcta."` - Current password verification failed
+  - Supabase error message if update fails
+</ResponseField>
+
+<ResponseField name="success" type="boolean">
+  `true` if password was successfully changed
+</ResponseField>
+
+### Behavior
+
+1. **Session Check**: Verifies user is authenticated
+2. **Current Password Verification**: Attempts sign-in with current password
+3. **Password Update**: Updates password via Supabase Auth
+4. **Cache Revalidation**: Refreshes layout cache
+
+### Security
+
+- Requires valid current password (prevents unauthorized changes if session is hijacked)
+- Uses Supabase Auth's built-in password hashing
+- Session remains active after password change
+
+### Usage Example
+
+```typescript
+import { changePassword } from '@/core/actions/auth';
+
+async function handlePasswordChange(formData: FormData) {
+  const current = formData.get('currentPassword') as string;
+  const newPass = formData.get('newPassword') as string;
+  
+  const result = await changePassword(current, newPass);
+  
+  if (result.error) {
+    console.error(result.error);
+  } else {
+    console.log('Password changed successfully');
+  }
+}
+```
+
+---
+
+## login (Legacy)
+
+<Warning>
+  This is the legacy single-step login function. Use `initiateLogin` and `completeLogin` for the current 2FA flow.
+</Warning>
+
+Simple email/password authentication without role-based 2FA.
+
+```typescript
+export async function login(
+  email: string,
+  password: string
+): Promise<{
+  error?: string;
+}>
+```
+
+### Parameters
+
+<ParamField body="email" type="string" required>
+  User's email address
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  User's password
+</ParamField>
+
+### Return Values
+
+<ResponseField name="error" type="string">
+  Error message from Supabase Auth if authentication fails
+</ResponseField>
+
+### Behavior
+
+On success, redirects to `/dashboard`. On failure, returns error object.

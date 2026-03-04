@@ -1,0 +1,612 @@
+---
+title: Installation Guide
+description: Comprehensive installation instructions for DIDG System with prerequisites, configuration, and troubleshooting
+---
+
+# Installation Guide
+
+This guide provides detailed instructions for installing and configuring DIDG System, including prerequisites, system requirements, environment setup, and troubleshooting common issues.
+
+## Prerequisites
+
+Before installing DIDG System, ensure you have the following tools installed on your system:
+
+### Required Software
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    **Version 20.x or higher**
+    
+    Download from [nodejs.org](https://nodejs.org)
+  </Card>
+  
+  <Card title="npm" icon="npm">
+    **Version 10.x or higher**
+    
+    Included with Node.js installation
+  </Card>
+</CardGroup>
+
+### Verify Installation
+
+Check that Node.js and npm are properly installed:
+
+```bash
+node --version
+# Expected: v20.x.x or higher
+
+npm --version
+# Expected: 10.x.x or higher
+```
+
+<Warning>
+DIDG System uses Next.js 14 App Router features that require Node.js 20 or higher. Earlier versions are not supported.
+</Warning>
+
+### Optional Tools
+
+<AccordionGroup>
+  <Accordion title="Git" icon="git">
+    Required for cloning the repository and version control.
+    
+    ```bash
+    # Verify Git installation
+    git --version
+    ```
+    
+    Download from [git-scm.com](https://git-scm.com)
+  </Accordion>
+
+  <Accordion title="VS Code" icon="code">
+    Recommended code editor with excellent TypeScript and React support.
+    
+    Recommended extensions:
+    - ESLint
+    - Tailwind CSS IntelliSense
+    - TypeScript and JavaScript Language Features
+    - Prettier
+  </Accordion>
+
+  <Accordion title="Supabase CLI" icon="database">
+    Optional but useful for local database development and migrations.
+    
+    ```bash
+    npm install -g supabase
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## System Requirements
+
+### Minimum Requirements
+
+- **OS**: Windows 10+, macOS 10.15+, or Linux (Ubuntu 20.04+)
+- **RAM**: 4 GB minimum, 8 GB recommended
+- **Disk Space**: 500 MB for dependencies and build files
+- **Browser**: Chrome 90+, Firefox 88+, Safari 14+, or Edge 90+
+
+### Recommended Specifications
+
+- **RAM**: 8 GB or more for optimal development experience
+- **SSD**: Recommended for faster build times
+- **Internet**: Stable connection for npm packages and Supabase
+
+## Installation Steps
+
+### 1. Clone the Repository
+
+Clone the DIDG System repository from GitHub:
+
+```bash
+git clone https://github.com/tu-usuario/didg-system.git
+cd didg-system/didg-website
+```
+
+<Info>
+The repository contains the main application in the `didg-website` directory.
+</Info>
+
+### 2. Install Dependencies
+
+Install all required npm packages:
+
+```bash
+npm install
+```
+
+This installs the following production dependencies:
+
+<Accordion title="View all dependencies">
+  **Core Framework:**
+  - `next@14.1.0` - React framework
+  - `react@^18` - UI library
+  - `react-dom@^18` - React DOM renderer
+  - `typescript@^5` - Type safety
+
+  **UI & Styling:**
+  - `tailwindcss@^3.4.1` - Utility-first CSS
+  - `@radix-ui/react-dialog@^1.0.5` - Accessible modals
+  - `@radix-ui/react-dropdown-menu@^2.0.6` - Dropdown menus
+  - `@radix-ui/react-slot@^1.0.2` - Component composition
+  - `framer-motion@^11.0.3` - Animations
+  - `lucide-react@^0.562.0` - Icons
+  - `next-themes@^0.4.6` - Theme management
+  - `clsx@^2.1.0` - Conditional classes
+  - `tailwind-merge@^2.2.1` - Tailwind class merging
+
+  **Backend & Database:**
+  - `@supabase/supabase-js@^2.39.3` - Supabase client
+  - `@supabase/ssr@^0.1.0` - Server-side rendering support
+
+  **State & Forms:**
+  - `zustand@^4.5.0` - State management
+  - `react-hook-form@^7.50.0` - Form handling
+  - `@hookform/resolvers@^5.2.2` - Form validation
+  - `zod@^3.22.4` - Schema validation
+
+  **Utilities:**
+  - `cmdk@^1.1.1` - Command menu
+  - `date-fns@^4.1.0` - Date utilities
+  - `canvas-confetti@^1.9.4` - Confetti effects
+  - `react-markdown@^10.1.0` - Markdown rendering
+  - `xlsx@^0.18.5` - Excel file handling
+  - `jszip@^3.10.1` - ZIP file handling
+  - `recharts@^3.6.0` - Charts
+
+  **Analytics:**
+  - `@vercel/analytics@^1.6.1` - Vercel Analytics
+</Accordion>
+
+### 3. Environment Configuration
+
+Create a `.env.local` file in the root of the `didg-website` directory:
+
+```bash
+touch .env.local
+```
+
+<Note>
+The `.env.local` file is automatically ignored by Git and should never be committed to version control.
+</Note>
+
+#### Required Environment Variables
+
+```bash .env.local
+# Supabase Configuration (Required)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+
+# Telegram Bot Configuration (Optional)
+TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
+TEGRAM_CHAT_ID=123456789
+```
+
+#### Supabase Setup
+
+<Steps>
+  <Step title="Create Supabase Project">
+    1. Go to [supabase.com](https://supabase.com)
+    2. Sign up or log in
+    3. Click **New Project**
+    4. Choose a name, password, and region
+    5. Wait for project initialization (~2 minutes)
+  </Step>
+
+  <Step title="Get API Credentials">
+    1. Navigate to **Settings** → **API**
+    2. Copy **Project URL** → use for `NEXT_PUBLIC_SUPABASE_URL`
+    3. Copy **anon/public** key → use for `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+    <Warning>
+    Never use the `service_role` key in your `.env.local` file. Only use the `anon` key for client-side code.
+    </Warning>
+  </Step>
+
+  <Step title="Configure Database Schema">
+    Create the required tables in your Supabase database. Here's the structure for core tables:
+
+    **Subjects Table:**
+    ```sql
+    CREATE TABLE subjects (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      name TEXT NOT NULL,
+      code TEXT NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    ```
+
+    **Ayudantias Table:**
+    ```sql
+    CREATE TABLE ayudantias (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      title TEXT NOT NULL,
+      description TEXT,
+      date DATE NOT NULL,
+      subject_id UUID REFERENCES subjects(id),
+      video_url TEXT,
+      material_url TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    ```
+
+    **Extra Resources Table:**
+    ```sql
+    CREATE TABLE extra_resources (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      title TEXT NOT NULL,
+      description TEXT,
+      url TEXT,
+      tags TEXT[],
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    ```
+
+    **Resource Bookmarks Table:**
+    ```sql
+    CREATE TABLE resource_bookmarks (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+      resource_id UUID REFERENCES extra_resources(id) ON DELETE CASCADE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      UNIQUE(user_id, resource_id)
+    );
+    ```
+  </Step>
+
+  <Step title="Enable Row Level Security">
+    Protect your data with RLS policies:
+
+    ```sql
+    -- Enable RLS
+    ALTER TABLE resource_bookmarks ENABLE ROW LEVEL SECURITY;
+
+    -- Users can only access their own bookmarks
+    CREATE POLICY "Users manage own bookmarks"
+    ON resource_bookmarks
+    FOR ALL
+    USING (auth.uid() = user_id);
+
+    -- Everyone can read subjects
+    ALTER TABLE subjects ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY "Subjects are viewable by everyone"
+    ON subjects FOR SELECT
+    USING (true);
+
+    -- Everyone can read ayudantias
+    ALTER TABLE ayudantias ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY "Ayudantias are viewable by everyone"
+    ON ayudantias FOR SELECT
+    USING (true);
+    ```
+  </Step>
+
+  <Step title="Set Up Storage Buckets">
+    Create storage buckets for file uploads:
+
+    1. Go to **Storage** in Supabase dashboard
+    2. Create a new bucket named `course-materials`
+    3. Configure bucket policies:
+
+    ```sql
+    -- Allow authenticated users to upload
+    CREATE POLICY "Authenticated users can upload"
+    ON storage.objects FOR INSERT
+    TO authenticated
+    WITH CHECK (bucket_id = 'course-materials');
+
+    -- Allow everyone to download
+    CREATE POLICY "Anyone can download"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'course-materials');
+    ```
+  </Step>
+</Steps>
+
+#### Telegram Integration (Optional)
+
+<Steps>
+  <Step title="Create Telegram Bot">
+    1. Open Telegram and search for **@BotFather**
+    2. Send `/newbot` command
+    3. Follow prompts to name your bot
+    4. Copy the bot token provided
+    5. Paste into `TELEGRAM_BOT_TOKEN` in `.env.local`
+  </Step>
+
+  <Step title="Get Chat ID">
+    1. Send any message to your bot
+    2. Visit this URL in your browser:
+    ```
+    https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
+    ```
+    3. Find `"chat":{"id":123456789}` in the JSON response
+    4. Copy the ID number
+    5. Paste into `TELEGRAM_CHAT_ID` in `.env.local`
+  </Step>
+</Steps>
+
+<Info>
+Telegram integration enables:
+- 2FA for administrative actions
+- Real-time notifications for student requests
+- Feedback and contact form alerts
+
+The application will function without Telegram, but these features will be disabled.
+</Info>
+
+### 4. Configure Supabase Client
+
+The application uses separate Supabase clients for different contexts:
+
+**Browser Client** (`src/infrastructure/supabase/client.ts`):
+```typescript
+import { createBrowserClient } from '@supabase/ssr'
+import { Database } from '@/types/supabase'
+
+export function createClient() {
+  return createBrowserClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+```
+
+**Server Client** (for Server Actions and API routes) is configured in `src/infrastructure/supabase/server.ts`.
+
+### 5. Run Development Server
+
+Start the Next.js development server:
+
+```bash
+npm run dev
+```
+
+The application will be available at:
+- **Local**: http://localhost:3000
+- **Network**: http://192.168.x.x:3000 (accessible from other devices on your network)
+
+<Note>
+The development server includes:
+- Hot Module Replacement (HMR)
+- Fast Refresh for React components
+- Automatic TypeScript type checking
+- Error overlay for debugging
+</Note>
+
+## Build for Production
+
+### Create Production Build
+
+```bash
+npm run build
+```
+
+This command:
+1. Type-checks your TypeScript code
+2. Runs ESLint validation
+3. Optimizes and bundles all code
+4. Generates static pages where possible
+5. Creates optimized images
+
+Expected output:
+```bash
+✓ Linting and checking validity of types
+✓ Creating an optimized production build
+✓ Compiled successfully
+✓ Collecting page data
+✓ Generating static pages (15/15)
+✓ Finalizing page optimization
+
+Route (app)                              Size     First Load JS
+┌ ○ /                                    5.2 kB         92.1 kB
+├ ○ /about                               1.8 kB         89.7 kB
+├ ○ /contact                             2.1 kB         90.0 kB
+└ ○ /login                               3.5 kB         91.4 kB
+
+○  (Static)  prerendered as static content
+```
+
+### Start Production Server
+
+```bash
+npm run start
+```
+
+<Warning>
+For production deployment, it's recommended to use a platform like Vercel, which is optimized for Next.js applications.
+</Warning>
+
+## Troubleshooting
+
+### Common Installation Issues
+
+<AccordionGroup>
+  <Accordion title="npm install fails with ERESOLVE errors">
+    **Problem**: Dependency conflicts during installation
+
+    **Solution**:
+    ```bash
+    # Clear npm cache
+    npm cache clean --force
+
+    # Delete lock file and node_modules
+    rm package-lock.json
+    rm -rf node_modules
+
+    # Reinstall with legacy peer deps
+    npm install --legacy-peer-deps
+    ```
+  </Accordion>
+
+  <Accordion title="Module not found errors">
+    **Problem**: TypeScript cannot find imported modules
+
+    **Solution**:
+    1. Check that `tsconfig.json` includes correct paths:
+    ```json
+    {
+      "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+          "@/*": ["./src/*"]
+        }
+      }
+    }
+    ```
+    2. Restart TypeScript server in VS Code: `Ctrl+Shift+P` → "TypeScript: Restart TS Server"
+  </Accordion>
+
+  <Accordion title="Supabase connection errors">
+    **Problem**: Cannot connect to Supabase or authentication fails
+
+    **Checklist**:
+    - ✓ Verify `NEXT_PUBLIC_SUPABASE_URL` is correct
+    - ✓ Verify `NEXT_PUBLIC_SUPABASE_ANON_KEY` is the anon key (not service role)
+    - ✓ Check Supabase project is not paused (free tier pauses after inactivity)
+    - ✓ Restart development server after changing env variables
+    - ✓ Clear browser cookies and localStorage
+
+    **Test connection**:
+    ```typescript
+    // Create a test file to verify connection
+    import { createClient } from '@/infrastructure/supabase/client'
+
+    const supabase = createClient()
+    const { data, error } = await supabase.from('subjects').select('*')
+    console.log({ data, error })
+    ```
+  </Accordion>
+
+  <Accordion title="Telegram notifications not working">
+    **Problem**: Bot doesn't send messages
+
+    **Checklist**:
+    - ✓ Verify `TELEGRAM_BOT_TOKEN` is correct
+    - ✓ Verify `TELEGRAM_CHAT_ID` is your personal chat ID
+    - ✓ Ensure you've sent at least one message to your bot
+    - ✓ Check bot isn't blocked
+
+    **Test Telegram integration**:
+    ```typescript
+    // Use the Telegram action
+    import { sendTelegramMessage } from '@/core/lib/telegram'
+
+    await sendTelegramMessage('Test message from DIDG System')
+    ```
+  </Accordion>
+
+  <Accordion title="Build fails with type errors">
+    **Problem**: TypeScript errors during `npm run build`
+
+    **Solution**:
+    1. Run type check locally:
+    ```bash
+    npx tsc --noEmit
+    ```
+    2. Fix any type errors shown
+    3. Common issues:
+       - Missing type definitions for Supabase tables
+       - Incorrect import paths
+       - Missing null checks
+
+    **Generate Supabase types**:
+    ```bash
+    npx supabase gen types typescript --project-id your-project-id > src/types/supabase.ts
+    ```
+  </Accordion>
+
+  <Accordion title="Styles not loading correctly">
+    **Problem**: Tailwind CSS classes not applied
+
+    **Solution**:
+    1. Verify `tailwind.config.js` includes correct content paths:
+    ```javascript
+    module.exports = {
+      content: [
+        './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+      ],
+      // ...
+    }
+    ```
+    2. Restart development server
+    3. Clear `.next` folder:
+    ```bash
+    rm -rf .next
+    npm run dev
+    ```
+  </Accordion>
+
+  <Accordion title="Port 3000 already in use">
+    **Problem**: Another application is using port 3000
+
+    **Solution**:
+    ```bash
+    # Find process using port 3000
+    lsof -ti:3000
+
+    # Kill the process
+    kill -9 $(lsof -ti:3000)
+
+    # Or run on a different port
+    PORT=3001 npm run dev
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Performance Issues
+
+<Accordion title="Slow development server">
+  **Symptoms**: Slow page loads, delayed hot reload
+
+  **Solutions**:
+  - Close unused browser tabs
+  - Disable browser extensions
+  - Increase Node.js memory:
+    ```bash
+    NODE_OPTIONS="--max-old-space-size=4096" npm run dev
+    ```
+  - Use faster disk (SSD recommended)
+  - Clear `.next` folder periodically
+</Accordion>
+
+## Verification Checklist
+
+After installation, verify these features work correctly:
+
+- [ ] Homepage loads at http://localhost:3000
+- [ ] Theme toggle switches between light/dark mode
+- [ ] Command menu opens with `Ctrl+K`
+- [ ] Login page accessible at `/login`
+- [ ] Supabase connection working (check `/courses` page)
+- [ ] Authentication flow works (create test user and log in)
+- [ ] Dashboard accessible after login
+- [ ] Telegram bot status shows "Connected" (if configured)
+- [ ] No console errors in browser developer tools
+- [ ] Build completes successfully with `npm run build`
+
+## Next Steps
+
+After successful installation:
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Follow the quickstart for a guided walkthrough
+  </Card>
+  
+  <Card title="Add Sample Data" icon="database">
+    Populate your database with subjects, ayudantías, and resources
+  </Card>
+  
+  <Card title="Configure Deployment" icon="cloud">
+    Set up production deployment on Vercel or your preferred platform
+  </Card>
+  
+  <Card title="Customize Settings" icon="gear">
+    Modify theme colors, fonts, and branding in Tailwind config
+  </Card>
+</CardGroup>
+
+<Info>
+For deployment instructions and production configuration, consider setting up on Vercel which provides automatic deployments for Next.js applications with zero configuration.
+</Info>

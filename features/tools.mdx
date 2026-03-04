@@ -1,0 +1,590 @@
+---
+title: "Interactive Tools"
+description: "Grade simulator, command palette, Zen mode, and terminal-based features for enhanced productivity"
+icon: "wrench"
+---
+
+## Overview
+
+DIDG System includes powerful interactive tools designed to boost student productivity and provide quick access to platform features.
+
+<CardGroup cols={2}>
+  <Card title="Grade Simulator" icon="calculator">
+    Calculate required grades to pass courses with dynamic weight calculations
+  </Card>
+  <Card title="Command Palette" icon="command">
+    Navigate instantly with keyboard shortcuts (Ctrl+K or Cmd+K)
+  </Card>
+  <Card title="Code Terminal" icon="terminal">
+    Execute code in multiple languages directly in your browser
+  </Card>
+  <Card title="Theme System" icon="palette">
+    Switch between light, dark, and system themes
+  </Card>
+</CardGroup>
+
+## Grade Simulator
+
+The Grade Simulator helps students calculate what grades they need on remaining assignments to achieve their target course grade.
+
+**Source:** `GradeSimulator.tsx:13-224`
+
+### Features
+
+<Steps>
+  <Step title="Add Evaluations">
+    Create unlimited evaluation items with custom names and weights
+  </Step>
+  <Step title="Set Weights">
+    Assign percentage weights to each evaluation (e.g., 25% for midterm)
+  </Step>
+  <Step title="Enter Grades">
+    Input achieved grades (1.0 - 7.0 scale)
+  </Step>
+  <Step title="See Results">
+    Instantly see required grade for remaining evaluations
+  </Step>
+</Steps>
+
+### Data Structure
+
+```typescript
+interface GradeItem {
+  id: string;
+  name: string;
+  weight: number;  // Percentage (0-100)
+  grade: number | null;  // Grade (1.0 - 7.0)
+}
+```
+
+### Calculation Logic
+
+**Source:** `GradeSimulator.tsx:26-64`
+
+The simulator uses real-time calculation with two key metrics:
+
+#### 1. Current Average
+
+Calculates your current grade based on completed evaluations:
+
+```typescript
+let totalWeightedScore = 0;
+let totalWeightUsed = 0;
+
+grades.forEach(g => {
+  if (g.grade !== null) {
+    totalWeightedScore += g.grade * (g.weight / 100);
+    totalWeightUsed += g.weight;
+  }
+});
+
+if (totalWeightUsed > 0) {
+  const currentAverage = totalWeightedScore / (totalWeightUsed / 100);
+  // Example: If you have 5.0 in 50% of the course
+  // currentAverage = (5.0 * 0.5) / 0.5 = 5.0
+}
+```
+
+#### 2. Required Grade
+
+Calculates what you need on remaining evaluations to hit your target:
+
+```typescript
+const totalDefinedWeight = grades.reduce((sum, g) => sum + g.weight, 0);
+
+if (totalDefinedWeight < 100) {
+  const remaining = 100 - totalDefinedWeight;
+  // Formula: (Target - CurrentAccumulated) / RemainingWeight%
+  const scoreNeeded = (targetGrade - totalWeightedScore) / (remaining / 100);
+  
+  // Example: Target 4.0, have 2.0 accumulated from 50%
+  // Need: (4.0 - 2.0) / 0.5 = 4.0 in remaining 50%
+}
+```
+
+### Component Features
+
+<Tabs>
+  <Tab title="Add Evaluation">
+    **Source:** `GradeSimulator.tsx:66-69`
+    
+    ```typescript
+    const addGrade = () => {
+      const id = Date.now().toString();
+      setGrades([...grades, { 
+        id, 
+        name: `Evaluación ${grades.length + 1}`, 
+        weight: 10, 
+        grade: null 
+      }]);
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Remove Evaluation">
+    **Source:** `GradeSimulator.tsx:71-73`
+    
+    ```typescript
+    const removeGrade = (id: string) => {
+      setGrades(grades.filter(g => g.id !== id));
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Update Values">
+    **Source:** `GradeSimulator.tsx:75-77`
+    
+    ```typescript
+    const updateGrade = (id: string, field: keyof GradeItem, value: any) => {
+      setGrades(grades.map(g => g.id === id ? { ...g, [field]: value } : g));
+    };
+    ```
+  </Tab>
+</Tabs>
+
+### Visual Feedback
+
+**Color-coded Results** (`GradeSimulator.tsx:194-198`)
+
+<Note>
+  The simulator uses color psychology to indicate difficulty:
+</Note>
+
+```typescript
+// Result colors based on required grade
+needed > 7.0 ? 'text-red-500'       // Impossible (💀)
+needed > 5.5 ? 'text-orange-500'    // Difficult
+needed <= 4.0 ? 'text-emerald-500'  // Easy
+```
+
+| Required Grade | Color | Message |
+|----------------|-------|----------|
+| > 7.0 | Red | "💀 F, soldado." (Impossible) |
+| 5.6 - 7.0 | Orange | High difficulty |
+| 4.1 - 5.5 | Indigo | Moderate |
+| ≤ 4.0 | Emerald | Achievable |
+
+### Validation
+
+**Weight Validation** (`GradeSimulator.tsx:79`)
+
+```typescript
+const totalWeight = grades.reduce((sum, g) => sum + g.weight, 0);
+
+{totalWeight > 100 && (
+  <span className="text-[10px] text-red-400">
+    ¡Te pasaste del 100%!
+  </span>
+)}
+```
+
+<Warning>
+  If total weight exceeds 100%, the calculator displays a warning but continues working.
+</Warning>
+
+## Command Palette
+
+Instant navigation and actions via keyboard shortcut.
+
+**Source:** `CommandMenu.tsx:27-161`
+
+### Activation
+
+<ParamField path="shortcut" type="string" default="Ctrl+K / Cmd+K">
+  Press `Ctrl+K` (Windows/Linux) or `Cmd+K` (macOS) to open
+</ParamField>
+
+**Implementation** (`CommandMenu.tsx:33-42`)
+
+```typescript
+React.useEffect(() => {
+  const down = (e: KeyboardEvent) => {
+    if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      setOpen((open) => !open);
+    }
+  };
+  document.addEventListener("keydown", down);
+  return () => document.removeEventListener("keydown", down);
+}, []);
+```
+
+### Available Commands
+
+<Tabs>
+  <Tab title="Navigation">
+    **Pages** (`CommandMenu.tsx:98-114`)
+    
+    - 🏠 **Inicio** → `/`
+    - 💻 **Proyectos** → `/projects`
+    - 🎓 **Ayudantías** → `/courses`
+    - 📚 **Recursos** → `/resources`
+    - 👤 **Sobre mí** → `/about`
+  </Tab>
+  
+  <Tab title="Social">
+    **External Links** (`CommandMenu.tsx:116-126`)
+    
+    - 🐙 **GitHub** → Opens in new tab
+    - 💼 **LinkedIn** → Opens in new tab
+    - ✉️ **Enviar Mensaje** → `/contact`
+  </Tab>
+  
+  <Tab title="Utilities">
+    **General Actions** (`CommandMenu.tsx:128-144`)
+    
+    - 📋 **Copiar Email** → Copies to clipboard
+    - 🔗 **Copiar URL Actual** → Copies current page URL
+    - 🌙 **Modo Oscuro** → Dark theme
+    - ☀️ **Modo Claro** → Light theme
+    - 💻 **Sistema** → System preference
+  </Tab>
+</Tabs>
+
+### Command Execution
+
+**Source:** `CommandMenu.tsx:44-46`
+
+```typescript
+const runCommand = React.useCallback((command: () => unknown) => {
+  setOpen(false);
+  command();
+}, []);
+```
+
+Commands close the palette automatically after execution.
+
+### Clipboard Operations
+
+**Source:** `CommandMenu.tsx:49-53`
+
+```typescript
+const copyToClipboard = (text: string, message: string) => {
+  navigator.clipboard.writeText(text);
+  console.log(message); 
+  setOpen(false);
+};
+```
+
+### Mobile Support
+
+**Floating Button** (`CommandMenu.tsx:60-74`)
+
+```typescript
+<button
+  onClick={() => setOpen(true)}
+  className={cn(
+    "md:hidden fixed bottom-36 right-4 z-[50] flex h-12 w-12 items-center justify-center rounded-full bg-surface text-text-main shadow-[0_0_15px_rgba(0,0,0,0.2)] border border-text-main/10 hover:scale-110 active:scale-95 transition-all duration-300",
+    isVisible
+      ? "opacity-100 translate-y-0 scale-100"
+      : "opacity-0 translate-y-32 scale-50 pointer-events-none"
+  )}
+>
+  <CommandIcon className="w-5 h-5" />
+</button>
+```
+
+<Note>
+  On mobile devices, a floating button appears in the bottom-right corner for easy access.
+</Note>
+
+## Code Terminal
+
+Execute code in multiple programming languages directly in the browser.
+
+**Source:** `CodeTerminal.tsx:45-216`
+
+### Supported Languages
+
+**Configuration** (`CodeTerminal.tsx:7-43`)
+
+```typescript
+const LANGUAGES = [
+  { 
+    id: "python", 
+    name: "Python", 
+    version: "3.10.0", 
+    icon: "🐍",
+    snippet: `def greet(name):\n    print(f"Hola, {name} desde Python!")\n\ngreet("Visitante")` 
+  },
+  { 
+    id: "javascript", 
+    name: "JS (Node)", 
+    version: "18.15.0", 
+    icon: "🟨",
+    snippet: `const greet = (name) => {\n  console.log(\`Hola, \${name} desde Node.js!\`);\n};\n\ngreet("Visitante");` 
+  },
+  { 
+    id: "typescript", 
+    name: "TypeScript", 
+    version: "5.0.3", 
+    icon: "🟦",
+    snippet: `const greet = (name: string): void => {\n  console.log(\`Hola, \${name} desde TypeScript!\`);\n};\n\ngreet("Visitante");` 
+  },
+  { 
+    id: "java", 
+    name: "Java", 
+    version: "15.0.2", 
+    icon: "☕",
+    snippet: `public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hola Visitante desde Java!");\n    }\n}` 
+  },
+  { 
+    id: "cpp", 
+    name: "C++", 
+    version: "10.2.0", 
+    icon: "⚙️",
+    snippet: `#include <iostream>\n\nint main() {\n    std::cout << "Hola Visitante desde C++!" << std::endl;\n    return 0;\n}` 
+  },
+];
+```
+
+### Code Execution
+
+**API Integration** (`CodeTerminal.tsx:52-78`)
+
+Uses the [Piston API](https://github.com/engineer-man/piston) for code execution:
+
+```typescript
+const runCode = async () => {
+  setIsRunning(true);
+  
+  try {
+    const response = await fetch("https://emkc.org/api/v2/piston/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        language: activeLang.id,
+        version: activeLang.version,
+        files: [{ content: code }],
+      }),
+    });
+
+    const data = await response.json();
+    
+    if (data.run) {
+      setOutput(data.run.stdout || data.run.stderr || "Sin salida (Exit Code 0)");
+    } else {
+      setOutput("Error: No se pudo conectar al compilador.");
+    }
+  } catch (error) {
+    setOutput("Error de red. Intenta nuevamente.");
+  } finally {
+    setIsRunning(false);
+  }
+};
+```
+
+<ParamField path="language" type="string" required>
+  Programming language ID ("python", "javascript", etc.)
+</ParamField>
+
+<ParamField path="version" type="string" required>
+  Language version to use
+</ParamField>
+
+<ParamField path="files" type="array" required>
+  Array with single object containing code `content`
+</ParamField>
+
+### Terminal Features
+
+<Tabs>
+  <Tab title="Copy Code">
+    **Source:** `CodeTerminal.tsx:80-84`
+    
+    ```typescript
+    const handleCopy = () => {
+      navigator.clipboard.writeText(code);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    };
+    ```
+    
+    Shows checkmark for 2 seconds after copying.
+  </Tab>
+  
+  <Tab title="Reset Code">
+    **Source:** `CodeTerminal.tsx:86-91`
+    
+    ```typescript
+    const handleReset = () => {
+      if (confirm("¿Restaurar el código por defecto? Se perderán tus cambios.")) {
+        setCode(activeLang.snippet);
+        setOutput("");
+      }
+    };
+    ```
+    
+    Restores default snippet for current language.
+  </Tab>
+  
+  <Tab title="Clear Output">
+    **Source:** `CodeTerminal.tsx:93-95`
+    
+    ```typescript
+    const handleClear = () => {
+      setOutput("");
+    };
+    ```
+    
+    Clears terminal output display.
+  </Tab>
+</Tabs>
+
+### Output Formatting
+
+**Source:** `CodeTerminal.tsx:185-203`
+
+```typescript
+{isRunning ? (
+  <div className="flex items-center gap-2 text-yellow-500 animate-pulse">
+    <Loader2 className="w-3 h-3 animate-spin" />
+    Compilando...
+  </div>
+) : output ? (
+  <div className={cn(
+    "leading-relaxed", 
+    output.includes("Error") ? "text-red-400" : "text-emerald-400"
+  )}>
+    <span className="opacity-50 select-none mr-2">$</span>
+    {output}
+  </div>
+) : (
+  <div className="text-gray-700 italic text-xs mt-10 text-center">
+    {"> Presiona RUN para ver el resultado aquí..."}
+  </div>
+)}
+```
+
+**Output States:**
+- 🟡 **Compiling**: Yellow with spinner animation
+- 🟢 **Success**: Green text with $ prompt
+- 🔴 **Error**: Red text when "Error" detected in output
+- ⚪ **Empty**: Gray placeholder message
+
+## Theme System
+
+DIDG supports three theme modes accessible via the command palette.
+
+### Theme Options
+
+<Tabs>
+  <Tab title="Dark Mode">
+    **Activation:** Command palette → "Modo Oscuro"
+    
+    ```typescript
+    setTheme("dark")
+    ```
+    
+    - High contrast
+    - Reduced eye strain
+    - Primary color: Indigo (#6366F1)
+  </Tab>
+  
+  <Tab title="Light Mode">
+    **Activation:** Command palette → "Modo Claro"
+    
+    ```typescript
+    setTheme("light")
+    ```
+    
+    - Clean, professional look
+    - Better for daytime use
+    - Inverted color scheme
+  </Tab>
+  
+  <Tab title="System">
+    **Activation:** Command palette → "Sistema"
+    
+    ```typescript
+    setTheme("system")
+    ```
+    
+    - Follows OS preference
+    - Automatic switching
+    - Best for user comfort
+  </Tab>
+</Tabs>
+
+### Implementation
+
+**Source:** `CommandMenu.tsx:6, 30, 135-143`
+
+```typescript
+import { useTheme } from "next-themes";
+
+const { setTheme } = useTheme();
+
+// Theme commands
+<Item onSelect={() => runCommand(() => setTheme("dark"))}>
+  <Moon className="mr-2 h-4 w-4" /> Modo Oscuro
+</Item>
+<Item onSelect={() => runCommand(() => setTheme("light"))}>
+  <Sun className="mr-2 h-4 w-4" /> Modo Claro
+</Item>
+<Item onSelect={() => runCommand(() => setTheme("system"))}>
+  <Laptop className="mr-2 h-4 w-4" /> Sistema
+</Item>
+```
+
+## Keyboard Shortcuts
+
+| Shortcut | Action | Context |
+|----------|--------|----------|
+| `Ctrl/Cmd + K` | Open command palette | Global |
+| `↑` / `↓` | Navigate commands | Command palette |
+| `Enter` | Execute command | Command palette |
+| `Esc` | Close palette | Command palette |
+
+<Note>
+  All keyboard shortcuts are displayed in the command palette footer for easy reference.
+</Note>
+
+## Best Practices
+
+### Grade Simulator
+1. **Start with known weights**: Input evaluation weights first
+2. **Enter grades as you go**: Update after each evaluation
+3. **Check total weight**: Ensure it sums to 100%
+4. **Set realistic targets**: Use 4.0 for passing, 5.0+ for honors
+
+### Command Palette
+1. **Learn the shortcut**: `Ctrl/Cmd + K` becomes second nature
+2. **Use search**: Type to filter commands instantly
+3. **Explore categories**: Discover all available actions
+4. **Mobile access**: Use floating button on touch devices
+
+### Code Terminal
+1. **Test snippets quickly**: Perfect for algorithm practice
+2. **Compare languages**: Switch between languages easily
+3. **Save your work**: Copy code before switching languages
+4. **Check errors**: Read stderr output for debugging
+
+## Integration Example
+
+```tsx
+import { GradeSimulator } from '@/components/tools/GradeSimulator';
+import { CommandMenu } from '@/components/layout/CommandMenu';
+import { CodeTerminal } from '@/components/home/CodeTerminal';
+
+const ToolsPage = () => {
+  return (
+    <div className="space-y-8">
+      {/* Global command palette */}
+      <CommandMenu />
+      
+      {/* Grade calculator */}
+      <section>
+        <h2>Simulador de Notas</h2>
+        <GradeSimulator />
+      </section>
+      
+      {/* Code playground */}
+      <section>
+        <h2>Terminal de Código</h2>
+        <CodeTerminal />
+      </section>
+    </div>
+  );
+};
+```

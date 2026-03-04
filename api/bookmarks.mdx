@@ -1,0 +1,505 @@
+---
+title: 'Bookmarks API'
+description: 'Server actions for managing user bookmarks on resources and ayudantías'
+---
+
+## Overview
+
+The Bookmarks API allows students to save their favorite resources and ayudantías for quick access. The system uses toggle functionality (like/unlike) and provides retrieval functions for personal libraries.
+
+**Two Separate Systems:**
+- **Resource Bookmarks**: For extra educational resources
+- **Ayudantía Bookmarks**: For teaching assistant sessions
+
+---
+
+## Resource Bookmarks
+
+### toggleBookmark
+
+Toggles a bookmark on an extra resource. If bookmarked, removes it. If not bookmarked, adds it.
+
+```typescript
+export async function toggleBookmark(resourceId: string): Promise<{
+  ok: boolean;
+  message?: string;
+  isBookmarked?: boolean;
+}>
+```
+
+#### Parameters
+
+<ParamField body="resourceId" type="string" required>
+  UUID of the resource to bookmark/unbookmark
+</ParamField>
+
+#### Return Values
+
+<ResponseField name="ok" type="boolean">
+  `true` if operation succeeded, `false` otherwise
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Error message if user is not authenticated: `"No autenticado"`
+</ResponseField>
+
+<ResponseField name="isBookmarked" type="boolean">
+  New bookmark state after toggle:
+  - `true` if bookmark was added
+  - `false` if bookmark was removed
+</ResponseField>
+
+#### Behavior
+
+1. **Authentication Check**: Verifies user is logged in
+2. **Existence Check**: Queries `resource_bookmarks` table for existing bookmark
+3. **Toggle Logic**:
+   - If exists: Deletes bookmark (unbookmark)
+   - If not exists: Inserts bookmark (bookmark)
+4. **Cache Revalidation**: Updates `/resources` and `/profile` paths
+
+#### Database Operations
+
+```typescript
+// Check for existing bookmark
+const { data: existing } = await supabase
+  .from("resource_bookmarks")
+  .select("*")
+  .eq("user_id", user.id)
+  .eq("resource_id", resourceId)
+  .single();
+
+if (existing) {
+  // Delete (unbookmark)
+  await supabase
+    .from("resource_bookmarks")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("resource_id", resourceId);
+} else {
+  // Insert (bookmark)
+  await supabase
+    .from("resource_bookmarks")
+    .insert({ user_id: user.id, resource_id: resourceId });
+}
+```
+
+#### Usage Example
+
+```typescript
+import { toggleBookmark } from '@/core/actions/bookmarks';
+import { useState } from 'react';
+
+function BookmarkButton({ resourceId, initialState }: Props) {
+  const [isBookmarked, setIsBookmarked] = useState(initialState);
+  
+  async function handleToggle() {
+    const result = await toggleBookmark(resourceId);
+    
+    if (result.ok) {
+      setIsBookmarked(result.isBookmarked!);
+    } else {
+      alert(result.message);
+    }
+  }
+  
+  return (
+    <button onClick={handleToggle}>
+      {isBookmarked ? '❤️ Bookmarked' : '🤍 Bookmark'}
+    </button>
+  );
+}
+```
+
+#### Optimistic UI Pattern
+
+```typescript
+function OptimisticBookmarkButton({ resourceId, initialState }: Props) {
+  const [isBookmarked, setIsBookmarked] = useState(initialState);
+  
+  async function handleToggle() {
+    // Optimistic update
+    const newState = !isBookmarked;
+    setIsBookmarked(newState);
+    
+    const result = await toggleBookmark(resourceId);
+    
+    // Revert if failed
+    if (!result.ok) {
+      setIsBookmarked(!newState);
+      alert(result.message);
+    }
+  }
+  
+  return (
+    <button onClick={handleToggle} disabled={!isBookmarked && isBookmarked !== initialState}>
+      {isBookmarked ? '❤️' : '🤍'}
+    </button>
+  );
+}
+```
+
+---
+
+### getUserBookmarks
+
+Retrieves all resources bookmarked by the current user, with full resource details.
+
+```typescript
+export async function getUserBookmarks(): Promise<ExtraResource[]>
+```
+
+#### Parameters
+
+None (uses authenticated user from session)
+
+#### Return Values
+
+<ResponseField name="bookmarks" type="ExtraResource[]">
+  Array of bookmarked resources with complete resource data. Returns empty array if:
+  - User is not authenticated
+  - User has no bookmarks
+  - Query fails
+</ResponseField>
+
+#### Behavior
+
+1. **Authentication Check**: Gets current user from session
+2. **Join Query**: Fetches bookmarks with related resource data
+3. **Ordering**: Returns bookmarks ordered by creation date (newest first)
+4. **Data Transformation**: Extracts resource objects from join result
+
+#### Query Structure
+
+```typescript
+const { data } = await supabase
+  .from("resource_bookmarks")
+  .select(`
+    resource_id,
+    extra_resources (*)
+  `)
+  .eq("user_id", user.id)
+  .order("created_at", { ascending: false });
+
+// Transform: [{ resource_id: '...', extra_resources: {...} }]
+// To: [{ id: '...', title: '...', ... }]
+return data?.map(item => item.extra_resources) || [];
+```
+
+#### Usage Example
+
+```typescript
+import { getUserBookmarks } from '@/core/actions/bookmarks';
+
+async function BookmarksPage() {
+  const bookmarks = await getUserBookmarks();
+  
+  return (
+    <div>
+      <h1>My Bookmarked Resources</h1>
+      {bookmarks.length === 0 ? (
+        <p>No bookmarks yet. Start exploring resources!</p>
+      ) : (
+        <div>
+          {bookmarks.map(resource => (
+            <ResourceCard key={resource.id} resource={resource} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## Ayudantía Bookmarks
+
+### toggleAyudantiaBookmark
+
+Toggles a bookmark on an ayudantía (teaching assistant session).
+
+```typescript
+export async function toggleAyudantiaBookmark(ayudantiaId: string): Promise<{
+  ok: boolean;
+  isBookmarked?: boolean;
+}>
+```
+
+#### Parameters
+
+<ParamField body="ayudantiaId" type="string" required>
+  UUID of the ayudantía to bookmark/unbookmark
+</ParamField>
+
+#### Return Values
+
+<ResponseField name="ok" type="boolean">
+  `true` if operation succeeded, `false` if user not authenticated
+</ResponseField>
+
+<ResponseField name="isBookmarked" type="boolean">
+  New bookmark state after toggle
+</ResponseField>
+
+#### Behavior
+
+1. Checks authentication
+2. Queries `ayudantia_bookmarks` table for existing bookmark
+3. Toggles bookmark state
+4. Revalidates `/courses/[subjectId]` and `/profile` paths
+
+#### Usage Example
+
+```typescript
+import { toggleAyudantiaBookmark } from '@/core/actions/bookmarks-ayudantias';
+
+function AyudantiaBookmarkButton({ ayudantiaId, initialState }: Props) {
+  const [isBookmarked, setIsBookmarked] = useState(initialState);
+  
+  async function handleToggle() {
+    const result = await toggleAyudantiaBookmark(ayudantiaId);
+    
+    if (result.ok) {
+      setIsBookmarked(result.isBookmarked!);
+    }
+  }
+  
+  return (
+    <button onClick={handleToggle}>
+      {isBookmarked ? '⭐ Favorited' : '☆ Favorite'}
+    </button>
+  );
+}
+```
+
+---
+
+### getUserAyudantiaBookmarks
+
+Retrieves all ayudantías bookmarked by the current user, including subject context.
+
+```typescript
+export async function getUserAyudantiaBookmarks(): Promise<Ayudantia[]>
+```
+
+#### Parameters
+
+None
+
+#### Return Values
+
+<ResponseField name="bookmarks" type="Ayudantia[]">
+  Array of bookmarked ayudantías with nested subject data:
+  ```typescript
+  {
+    id: string;
+    title: string;
+    description: string;
+    date: string;
+    video_url: string | null;
+    material_url: string | null;
+    subjects: {
+      name: string;
+      code: string;
+    }
+  }[]
+  ```
+</ResponseField>
+
+#### Behavior
+
+1. **Nested Query**: Fetches ayudantías with related subject information
+2. **Ordering**: Returns newest bookmarks first
+3. **Data Transformation**: Extracts ayudantía objects with nested subject data
+
+#### Query Structure
+
+```typescript
+const { data } = await supabase
+  .from("ayudantia_bookmarks")
+  .select(`
+    ayudantia_id,
+    ayudantias (
+      *,
+      subjects (name, code)
+    )
+  `)
+  .eq("user_id", user.id)
+  .order("created_at", { ascending: false });
+
+return data?.map(item => item.ayudantias) || [];
+```
+
+#### Usage Example
+
+```typescript
+import { getUserAyudantiaBookmarks } from '@/core/actions/bookmarks-ayudantias';
+
+async function FavoriteAyudantiasPage() {
+  const bookmarks = await getUserAyudantiaBookmarks();
+  
+  return (
+    <div>
+      <h1>My Favorite Ayudantías</h1>
+      {bookmarks.map(ayudantia => (
+        <div key={ayudantia.id}>
+          <h2>{ayudantia.title}</h2>
+          <p>Subject: {ayudantia.subjects.name} ({ayudantia.subjects.code})</p>
+          <p>Date: {new Date(ayudantia.date).toLocaleDateString()}</p>
+          
+          {ayudantia.video_url && (
+            <a href={ayudantia.video_url}>Watch Recording</a>
+          )}
+          
+          {ayudantia.material_url && (
+            <a href={`/api/download/${ayudantia.material_url}`}>Download Materials</a>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## Database Schema
+
+### resource_bookmarks Table
+
+```sql
+CREATE TABLE resource_bookmarks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  resource_id UUID REFERENCES extra_resources(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(user_id, resource_id)  -- Prevent duplicate bookmarks
+);
+```
+
+### ayudantia_bookmarks Table
+
+```sql
+CREATE TABLE ayudantia_bookmarks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  ayudantia_id UUID REFERENCES ayudantias(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(user_id, ayudantia_id)  -- Prevent duplicate bookmarks
+);
+```
+
+### Indexes for Performance
+
+```sql
+-- Speed up user bookmark lookups
+CREATE INDEX idx_resource_bookmarks_user ON resource_bookmarks(user_id);
+CREATE INDEX idx_ayudantia_bookmarks_user ON ayudantia_bookmarks(user_id);
+
+-- Speed up toggle operations
+CREATE INDEX idx_resource_bookmarks_lookup ON resource_bookmarks(user_id, resource_id);
+CREATE INDEX idx_ayudantia_bookmarks_lookup ON ayudantia_bookmarks(user_id, ayudantia_id);
+```
+
+---
+
+## Complete User Profile Example
+
+Combining both bookmark types in a user profile:
+
+```typescript
+import { getUserBookmarks } from '@/core/actions/bookmarks';
+import { getUserAyudantiaBookmarks } from '@/core/actions/bookmarks-ayudantias';
+
+async function UserProfilePage() {
+  const [resourceBookmarks, ayudantiaBookmarks] = await Promise.all([
+    getUserBookmarks(),
+    getUserAyudantiaBookmarks()
+  ]);
+  
+  return (
+    <div>
+      <h1>My Library</h1>
+      
+      <section>
+        <h2>Bookmarked Resources ({resourceBookmarks.length})</h2>
+        {resourceBookmarks.map(resource => (
+          <ResourceCard key={resource.id} resource={resource} />
+        ))}
+      </section>
+      
+      <section>
+        <h2>Favorite Ayudantías ({ayudantiaBookmarks.length})</h2>
+        {ayudantiaBookmarks.map(ayudantia => (
+          <AyudantiaCard key={ayudantia.id} ayudantia={ayudantia} />
+        ))}
+      </section>
+    </div>
+  );
+}
+```
+
+---
+
+## Best Practices
+
+### Client-Side State Management
+
+```typescript
+// Store bookmark state in context for global access
+import { createContext, useContext, useState } from 'react';
+
+const BookmarksContext = createContext({
+  resourceBookmarks: new Set<string>(),
+  ayudantiaBookmarks: new Set<string>(),
+  toggleResource: async (id: string) => {},
+  toggleAyudantia: async (id: string) => {},
+});
+
+export function BookmarksProvider({ children, initialData }: Props) {
+  const [resourceBookmarks, setResourceBookmarks] = useState(
+    new Set(initialData.resources.map(r => r.id))
+  );
+  const [ayudantiaBookmarks, setAyudantiaBookmarks] = useState(
+    new Set(initialData.ayudantias.map(a => a.id))
+  );
+  
+  async function toggleResource(id: string) {
+    const result = await toggleBookmark(id);
+    if (result.ok) {
+      setResourceBookmarks(prev => {
+        const next = new Set(prev);
+        result.isBookmarked ? next.add(id) : next.delete(id);
+        return next;
+      });
+    }
+  }
+  
+  // Similar for ayudantias...
+  
+  return (
+    <BookmarksContext.Provider value={{ resourceBookmarks, ayudantiaBookmarks, toggleResource, toggleAyudantia }}>
+      {children}
+    </BookmarksContext.Provider>
+  );
+}
+```
+
+### Checking Bookmark Status
+
+```typescript
+function ResourceCard({ resource }: Props) {
+  const { resourceBookmarks, toggleResource } = useContext(BookmarksContext);
+  const isBookmarked = resourceBookmarks.has(resource.id);
+  
+  return (
+    <div>
+      <h3>{resource.title}</h3>
+      <button onClick={() => toggleResource(resource.id)}>
+        {isBookmarked ? 'Unbookmark' : 'Bookmark'}
+      </button>
+    </div>
+  );
+}
+```

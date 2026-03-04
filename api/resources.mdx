@@ -1,0 +1,421 @@
+---
+title: 'Resource Management API'
+description: 'Server actions for managing extra educational resources with file uploads, categorization, and tagging'
+---
+
+## Overview
+
+The Resources API manages supplementary educational materials outside the core academic structure. Resources can include:
+- Uploaded files (stored in `materials` bucket)
+- External URLs (YouTube, articles, etc.)
+- Tags for discoverability
+- Categories for organization
+
+Resources are accessible to all students and managed by admins.
+
+---
+
+## saveResource
+
+Creates a new resource or updates an existing one. Handles file uploads to Supabase Storage.
+
+```typescript
+export async function saveResource(formData: FormData): Promise<{
+  ok: boolean;
+  message?: string;
+}>
+```
+
+### Parameters
+
+<ParamField body="formData" type="FormData" required>
+  <ParamField body="id" type="string">
+    UUID of existing resource (for updates). Omit for new resources.
+  </ParamField>
+  
+  <ParamField body="title" type="string" required>
+    Resource title
+  </ParamField>
+  
+  <ParamField body="description" type="string" required>
+    Resource description
+  </ParamField>
+  
+  <ParamField body="category" type="string" required>
+    Category for organization (e.g., "Programming", "Math")
+  </ParamField>
+  
+  <ParamField body="tags" type="string" required>
+    Comma-separated tags (e.g., "react, hooks, frontend")
+  </ParamField>
+  
+  <ParamField body="external_url" type="string">
+    Optional external URL (YouTube, article link, etc.)
+  </ParamField>
+  
+  <ParamField body="file" type="File">
+    Optional file upload
+  </ParamField>
+  
+  <ParamField body="existing_file_url" type="string">
+    Current file path (used when updating without replacing file)
+  </ParamField>
+</ParamField>
+
+### Return Values
+
+<ResponseField name="ok" type="boolean">
+  `true` if operation succeeded, `false` otherwise
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Error message if `ok` is `false`. Possible value:
+  - `"Error al guardar en base de datos"`
+</ResponseField>
+
+### Behavior
+
+1. **Tag Processing**: Converts comma-separated string to array
+   ```typescript
+   const tags = "react, hooks, frontend".split(",").map(t => t.trim()).filter(t => t.length > 0);
+   // Result: ["react", "hooks", "frontend"]
+   ```
+
+2. **File Upload** (if file provided):
+   - Generates unique filename: `{timestamp}_{sanitized_filename}`
+   - Uploads to `materials` storage bucket
+   - Stores path in `file_url`
+
+3. **Insert vs Update**:
+   - If `id` provided: Updates existing resource
+   - If `id` omitted: Creates new resource
+
+4. **Cache Revalidation**:
+   - `/resources` (public view)
+   - `/dashboard/resources` (admin view)
+
+### File Naming
+
+Files are sanitized to prevent issues:
+```typescript
+const fileName = `${Date.now()}_${file.name.replaceAll(" ", "_")}`;
+// Example: "1709571234567_React_Hooks_Guide.pdf"
+```
+
+### Usage Example
+
+```typescript
+import { saveResource } from '@/core/actions/admin-resources';
+
+function ResourceForm({ existingResource }: Props) {
+  async function handleSubmit(formData: FormData) {
+    const result = await saveResource(formData);
+    
+    if (result.ok) {
+      console.log('Resource saved!');
+    } else {
+      console.error(result.message);
+    }
+  }
+  
+  return (
+    <form action={handleSubmit}>
+      {existingResource && (
+        <input type="hidden" name="id" value={existingResource.id} />
+      )}
+      
+      <input name="title" required />
+      <textarea name="description" required />
+      <select name="category" required>
+        <option value="Programming">Programming</option>
+        <option value="Math">Math</option>
+      </select>
+      <input name="tags" placeholder="react, hooks, frontend" required />
+      <input name="external_url" type="url" />
+      <input name="file" type="file" />
+      
+      {existingResource?.file_url && (
+        <input type="hidden" name="existing_file_url" value={existingResource.file_url} />
+      )}
+      
+      <button type="submit">Save Resource</button>
+    </form>
+  );
+}
+```
+
+### Error Cases
+
+- Returns `{ ok: false, message: "Error subiendo archivo" }` if file upload fails
+- Returns `{ ok: false, message: "Error al guardar en base de datos" }` if database operation fails
+
+### Database Schema
+
+```typescript
+type ExtraResource = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  tags: string[];  // Stored as array in PostgreSQL
+  external_url: string | null;
+  file_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+```
+
+---
+
+## deleteResource
+
+Deletes a resource from the database. Note: Does not delete the associated file from storage.
+
+```typescript
+export async function deleteResource(id: string): Promise<{
+  ok: boolean;
+}>
+```
+
+### Parameters
+
+<ParamField body="id" type="string" required>
+  UUID of the resource to delete
+</ParamField>
+
+### Return Values
+
+<ResponseField name="ok" type="boolean">
+  `true` if deletion succeeded, `false` if error occurred
+</ResponseField>
+
+### Behavior
+
+1. Deletes resource from `extra_resources` table
+2. Revalidates `/resources` and `/dashboard/resources` paths
+3. Returns `{ ok: false }` on error (does not throw)
+
+<Warning>
+  This function does not delete the associated file from the `materials` bucket. Consider implementing file cleanup in a background job or extending this function.
+</Warning>
+
+### Usage Example
+
+```typescript
+import { deleteResource } from '@/core/actions/admin-resources';
+
+function DeleteResourceButton({ resourceId }: Props) {
+  async function handleDelete() {
+    const result = await deleteResource(resourceId);
+    
+    if (result.ok) {
+      console.log('Resource deleted');
+    } else {
+      console.error('Failed to delete resource');
+    }
+  }
+  
+  return (
+    <button onClick={handleDelete}>Delete</button>
+  );
+}
+```
+
+---
+
+## getExtraResources
+
+Retrieves all extra resources, ordered by creation date (newest first).
+
+```typescript
+export async function getExtraResources(): Promise<ExtraResource[]>
+```
+
+### Parameters
+
+None
+
+### Return Values
+
+<ResponseField name="resources" type="ExtraResource[]">
+  Array of resource objects, sorted by `created_at` descending. Returns empty array on error.
+</ResponseField>
+
+### Behavior
+
+1. Queries `extra_resources` table
+2. Orders by `created_at` (newest first)
+3. Returns empty array if error occurs (does not throw)
+
+<Note>
+  This function uses the **client-side** Supabase instance (`@/infrastructure/supabase/client`), which respects Row Level Security policies. Ensure RLS is configured appropriately.
+</Note>
+
+### Usage Example
+
+```typescript
+import { getExtraResources } from '@/core/actions/resources';
+
+async function ResourcesPage() {
+  const resources = await getExtraResources();
+  
+  return (
+    <div>
+      {resources.map(resource => (
+        <div key={resource.id}>
+          <h2>{resource.title}</h2>
+          <p>{resource.description}</p>
+          <p>Category: {resource.category}</p>
+          <p>Tags: {resource.tags.join(', ')}</p>
+          
+          {resource.external_url && (
+            <a href={resource.external_url}>View External Resource</a>
+          )}
+          
+          {resource.file_url && (
+            <a href={`/api/download/${resource.file_url}`}>Download File</a>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Filtering and Search
+
+Since this function returns all resources, implement client-side filtering:
+
+```typescript
+function FilteredResources() {
+  const [resources, setResources] = useState<ExtraResource[]>([]);
+  const [category, setCategory] = useState<string>('');
+  
+  useEffect(() => {
+    getExtraResources().then(setResources);
+  }, []);
+  
+  const filtered = resources.filter(r => 
+    !category || r.category === category
+  );
+  
+  return (
+    <div>
+      <select value={category} onChange={e => setCategory(e.target.value)}>
+        <option value="">All Categories</option>
+        <option value="Programming">Programming</option>
+        <option value="Math">Math</option>
+      </select>
+      
+      {filtered.map(resource => (
+        <ResourceCard key={resource.id} resource={resource} />
+      ))}
+    </div>
+  );
+}
+```
+
+### Tag-based Search
+
+```typescript
+function searchByTag(resources: ExtraResource[], searchTag: string) {
+  return resources.filter(resource => 
+    resource.tags.some(tag => 
+      tag.toLowerCase().includes(searchTag.toLowerCase())
+    )
+  );
+}
+
+// Usage
+const reactResources = searchByTag(allResources, 'react');
+```
+
+---
+
+## Storage Bucket Configuration
+
+### materials Bucket
+
+Resources are stored in the `materials` bucket with the following structure:
+
+```
+materials/
+  ├── 1709571234567_React_Hooks_Guide.pdf
+  ├── 1709571235678_Algorithm_Cheatsheet.pdf
+  └── 1709571236789_Linear_Algebra_Notes.pdf
+```
+
+### Access Control
+
+Ensure the bucket has appropriate policies:
+
+```sql
+-- Allow authenticated users to read
+CREATE POLICY "Allow authenticated read"
+ON storage.objects FOR SELECT
+TO authenticated
+USING (bucket_id = 'materials');
+
+-- Allow admins to upload
+CREATE POLICY "Allow admin upload"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'materials' AND
+  EXISTS (
+    SELECT 1 FROM profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  )
+);
+```
+
+---
+
+## Complete Workflow Example
+
+### Creating a Resource with File Upload
+
+```typescript
+import { saveResource } from '@/core/actions/admin-resources';
+
+async function createResourceWorkflow() {
+  const formData = new FormData();
+  formData.append('title', 'React Hooks Deep Dive');
+  formData.append('description', 'Comprehensive guide to React Hooks');
+  formData.append('category', 'Programming');
+  formData.append('tags', 'react, hooks, javascript, frontend');
+  formData.append('external_url', 'https://youtube.com/watch?v=example');
+  
+  // Add file from input
+  const fileInput = document.getElementById('file') as HTMLInputElement;
+  if (fileInput.files?.[0]) {
+    formData.append('file', fileInput.files[0]);
+  }
+  
+  const result = await saveResource(formData);
+  
+  if (result.ok) {
+    console.log('✅ Resource created successfully');
+  } else {
+    console.error('❌ Failed:', result.message);
+  }
+}
+```
+
+### Updating a Resource (Keeping Existing File)
+
+```typescript
+async function updateResourceWorkflow(existingResource: ExtraResource) {
+  const formData = new FormData();
+  formData.append('id', existingResource.id);  // Triggers update
+  formData.append('title', 'React Hooks Deep Dive (Updated)');
+  formData.append('description', existingResource.description);
+  formData.append('category', existingResource.category);
+  formData.append('tags', existingResource.tags.join(', '));
+  formData.append('existing_file_url', existingResource.file_url || '');
+  
+  // No file appended = keep existing file
+  
+  const result = await saveResource(formData);
+}
+```

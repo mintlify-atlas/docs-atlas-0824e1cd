@@ -1,0 +1,530 @@
+---
+title: 'Course Management'
+description: 'Guide for managing courses, semesters, and ayudantía sessions in DIDG'
+icon: 'book-open'
+---
+
+## Overview
+
+The DIDG platform organizes academic content hierarchically:
+- **Semesters** (e.g., "2024-2", "2025-1")
+- **Subjects** (e.g., "Base de Datos", "Programación Web")
+- **Ayudantías** (tutorial sessions with materials)
+
+This guide covers creating and managing all three levels.
+
+## Semester Management
+
+### Creating a New Semester
+
+Semesters are created from the courses dashboard at `/dashboard/courses`.
+
+<Steps>
+  <Step title="Navigate to Courses Dashboard">
+    Click "Ayudantías" in the admin sidebar or go to `/dashboard/courses`.
+  </Step>
+  
+  <Step title="Use the Semester Creation Form">
+    In the top-right corner, you'll see a form with:
+    - Input field: "Nuevo Semestre (Ej: 2024-2)"
+    - Plus icon button to submit
+  </Step>
+  
+  <Step title="Enter Semester Name">
+    Follow the naming convention: `YEAR-SEMESTER_NUMBER` (e.g., "2025-1" for first semester of 2025).
+  </Step>
+  
+  <Step title="Submit">
+    Click the plus icon. The `createSemester` server action:
+    - Inserts a new record in the `semesters` table
+    - Sets `is_active = true` by default
+    - Refreshes the page to show the new semester
+  </Step>
+</Steps>
+
+<Note>
+  New semesters are automatically marked as active and will appear on the public courses page.
+</Note>
+
+### Archiving/Activating Semesters
+
+Control which semesters appear on the public site.
+
+<Steps>
+  <Step title="Locate the Semester">
+    On `/dashboard/courses`, find the semester you want to manage.
+  </Step>
+  
+  <Step title="Check Current Status">
+    Look for the status badge:
+    - **Green "Activo"**: Visible to students
+    - **Gray "Archivado"**: Hidden from public view
+  </Step>
+  
+  <Step title="Toggle Status">
+    Click the "Archivar" or "Activar" link next to the status badge.
+    
+    The `toggleSemesterStatus` action:
+    - Updates `is_active` field
+    - Refreshes the view
+  </Step>
+</Steps>
+
+<Tip>
+  Archive past semesters to keep the student interface clean while preserving historical data for your records.
+</Tip>
+
+### Visual Indicators
+
+- **Active semesters**: Primary color left border (`border-primary`)
+- **Archived semesters**: Muted border and reduced opacity (`border-text-main/10 opacity-70`)
+
+## Subject Management
+
+### Adding Subjects to a Semester
+
+Each semester can contain multiple subjects.
+
+<Steps>
+  <Step title="Locate the Semester">
+    On `/dashboard/courses`, find the semester where you want to add a subject.
+  </Step>
+  
+  <Step title="Use the Subject Creation Card">
+    The first card in each semester's grid is the "Añadir Asignatura" form with:
+    - **Name** input: Full subject name (e.g., "Base de Datos")
+    - **Code** input: Unique identifier (e.g., "INF-239")
+    - **Crear** button: Submit the form
+  </Step>
+  
+  <Step title="Enter Subject Details">
+    - **Name**: Use official course titles for consistency
+    - **Code**: Follow your institution's course numbering system
+  </Step>
+  
+  <Step title="Submit">
+    Click "Crear". The `createSubject` action:
+    - Inserts a record in `subjects` table
+    - Links to the semester via `semester_id`
+    - Refreshes the page to display the new subject card
+  </Step>
+</Steps>
+
+<Note>
+  Subject codes should be unique across the platform to avoid confusion.
+</Note>
+
+### Subject Card Features
+
+Each subject card displays:
+- **Icon**: Book icon (`BookOpen`) with secondary color
+- **Name**: Subject title
+- **Code**: Course identifier in a monospace badge
+- **Actions**:
+  - **Notas**: Links to `/dashboard/grades?subject_id=[id]` for grade uploads
+  - **Ver Ayudantías**: Links to `/dashboard/courses/[subjectId]` for session management
+  - **Delete**: Trash icon to remove the subject
+
+### Deleting a Subject
+
+<Steps>
+  <Step title="Locate the Subject Card">
+    Find the subject you want to delete on `/dashboard/courses`.
+  </Step>
+  
+  <Step title="Click the Trash Icon">
+    In the top-right corner of the subject card, click the `Trash2` icon.
+  </Step>
+  
+  <Step title="Confirm Deletion">
+    The browser will prompt for confirmation.
+  </Step>
+  
+  <Step title="Action Executed">
+    The `deleteSubject` action removes the record from the database.
+    
+    **Warning:** This may fail if ayudantías are linked to the subject (foreign key constraint).
+  </Step>
+</Steps>
+
+<Tip>
+  Before deleting a subject, remove all associated ayudantías to avoid foreign key errors.
+</Tip>
+
+## Ayudantía Management
+
+### Accessing the Ayudantía Management Page
+
+<Steps>
+  <Step title="Navigate from Subject Card">
+    On `/dashboard/courses`, click "Ver Ayudantías" on any subject card.
+  </Step>
+  
+  <Step title="Arrive at Subject Page">
+    You'll land on `/dashboard/courses/[subjectId]`, which shows:
+    - Subject name and code in the header
+    - Search and filter toolbar (`AdminAyudantiaList`)
+    - List of all ayudantía sessions for this subject
+    - "Nueva Ayudantía" form (sticky sidebar or top panel)
+  </Step>
+</Steps>
+
+### Creating a New Ayudantía Session
+
+The `AyudantiaForm` component handles both creation and editing.
+
+<Steps>
+  <Step title="Locate the Creation Form">
+    On `/dashboard/courses/[subjectId]`, find the "Nueva Ayudantía" panel (usually on the right or top).
+  </Step>
+  
+  <Step title="Fill in Session Details">
+    Required fields:
+    - **Título**: Session title (e.g., "Ayudantía 1 - SQL Básico")
+    - **Fecha**: Date of the session (date picker)
+    
+    Optional fields:
+    - **Descripción**: Topics covered (supports Markdown)
+    - **Video URL**: YouTube or external video link
+    - **Material (PDF/ZIP)**: File upload for downloadable resources
+  </Step>
+  
+  <Step title="Upload Material (Optional)">
+    If you have lecture notes or code examples:
+    - Click the file input
+    - Select a PDF or ZIP file from your computer
+    - The file will be uploaded to Supabase Storage when you submit
+  </Step>
+  
+  <Step title="Add Video Link (Optional)">
+    If you recorded the session:
+    - Paste the YouTube URL (or other platform link)
+    - The platform will display a video icon on the ayudantía card
+  </Step>
+  
+  <Step title="Submit the Form">
+    Click "SUBIR CONTENIDO". The `createAyudantia` action:
+    - Uploads the file to Supabase Storage (if provided)
+    - Inserts a record in the `ayudantias` table with:
+      - `subject_id`: Links to the current subject
+      - `title`, `date`, `description`, `video_url`
+      - `material_url`: Public URL of uploaded file
+    - Displays a success alert
+    - Resets the form for the next entry
+  </Step>
+</Steps>
+
+<Note>
+  The form uses server actions, so submissions happen without client-side JavaScript. A loading spinner (`Loader2`) indicates processing.
+</Note>
+
+### Editing an Existing Ayudantía
+
+<Steps>
+  <Step title="Locate the Session">
+    On `/dashboard/courses/[subjectId]`, find the ayudantía you want to edit in the list.
+  </Step>
+  
+  <Step title="Click the Edit Button">
+    Each `AyudantiaCard` has an edit icon (visible on hover or always shown).
+  </Step>
+  
+  <Step title="Form Pre-Populated">
+    The `AyudantiaForm` switches to edit mode:
+    - Title bar changes to "Editar Ayudantía" with a blue save icon
+    - All fields are pre-filled with existing data
+    - File input says "Reemplazar Material (Opcional)"
+    - A checkmark indicates if a file already exists
+  </Step>
+  
+  <Step title="Make Changes">
+    Update any field. You can:
+    - Change title, date, or description
+    - Update the video URL
+    - Upload a new file to replace the old one (optional)
+  </Step>
+  
+  <Step title="Save Changes">
+    Click "GUARDAR CAMBIOS" (blue button). The `updateAyudantia` action:
+    - Updates the database record
+    - Replaces the file in storage if a new one was uploaded
+    - Shows success alert
+    - Closes the edit form
+  </Step>
+</Steps>
+
+<Tip>
+  You don't need to re-upload the file if you're only changing text fields. The existing file remains linked.
+</Tip>
+
+### Deleting an Ayudantía
+
+<Accordion title="How to delete an ayudantía session">
+  1. On `/dashboard/courses/[subjectId]`, locate the session in `AyudantiaCard`
+  2. Click the delete/trash icon (usually in the card's action menu)
+  3. Confirm the deletion
+  4. The `deleteAyudantia` action:
+     - Removes the database record
+     - Deletes the associated file from Supabase Storage (if configured)
+  5. The session disappears from the list
+</Accordion>
+
+### Filtering and Searching Ayudantías
+
+The `AdminAyudantiaList` component provides powerful filtering:
+
+**Search Bar:**
+- Type keywords to filter by title or description
+- Real-time filtering as you type
+
+**Filter Buttons:**
+- **Todos**: Show all sessions
+- **PDFs**: Show only sessions with PDF files
+- **Videos**: Show only sessions with video links
+
+<Steps>
+  <Step title="Use the Search Bar">
+    Type a keyword (e.g., "SQL") to find related sessions.
+  </Step>
+  
+  <Step title="Apply Type Filter">
+    Click "PDFs" to see only sessions with downloadable materials, or "Videos" for recorded sessions.
+  </Step>
+  
+  <Step title="Review Filtered Results">
+    The list updates instantly to show matching sessions.
+  </Step>
+</Steps>
+
+<Tip>
+  Use filters during exam prep to quickly find all video recordings or all practice problem PDFs.
+</Tip>
+
+## Organizing by Semesters
+
+### Semester Hierarchy
+
+```
+Semester: 2024-2 (Active)
+├── Subject: Base de Datos (INF-239)
+│   ├── Ayudantía 1 - Introducción SQL
+│   ├── Ayudantía 2 - Consultas JOIN
+│   └── Ayudantía 3 - Normalización
+├── Subject: Programación Web (INF-280)
+│   ├── Ayudantía 1 - HTML/CSS
+│   └── Ayudantía 2 - JavaScript
+```
+
+### Best Practices for Organization
+
+<Tip>
+  **Consistent Naming**: Use a pattern like "Ayudantía [Number] - [Topic]" for easy sorting.
+</Tip>
+
+<Tip>
+  **Chronological Order**: Sessions are auto-sorted by date (newest first), so set dates accurately.
+</Tip>
+
+<Tip>
+  **One Semester Per Period**: Create a new semester each academic term (e.g., "2025-1" for spring, "2025-2" for fall).
+</Tip>
+
+<Tip>
+  **Archive Old Content**: At the end of each term, archive the semester to keep the student view focused on current courses.
+</Tip>
+
+## Managing Course Settings
+
+### Subject-Level Settings
+
+Currently, subject settings are minimal (name and code). Future enhancements may include:
+- **Description**: Longer text about the course
+- **Syllabus URL**: Link to official syllabus
+- **Instructor Info**: Multiple instructors per subject
+
+<Note>
+  If you need to add custom settings, modify the `subjects` table schema in Supabase and update the creation form in `/dashboard/courses/page.tsx`.
+</Note>
+
+### Enrollment Management
+
+Enrollments link students to subjects:
+
+**Database Structure:**
+```
+enrollments {
+  id: uuid
+  student_id: uuid (references profiles)
+  subject_id: uuid (references subjects)
+}
+```
+
+**Workflow:**
+1. Students must be enrolled to see grades
+2. Enrollment is prerequisite for grade uploads (RUTs matched via enrollments)
+3. Manage enrollments via SQL or a future admin UI
+
+<Accordion title="How to manually enroll a student">
+  Currently, enrollment is managed via direct database insertion:
+  
+  ```sql
+  INSERT INTO enrollments (student_id, subject_id)
+  VALUES ('student-uuid-here', 'subject-uuid-here');
+  ```
+  
+  Future updates may add a UI for bulk enrollment or CSV import.
+</Accordion>
+
+## Ayudantía Material Guidelines
+
+### File Upload Best Practices
+
+<Tip>
+  **File Size**: Keep PDFs under 10MB for faster downloads. Compress large files before uploading.
+</Tip>
+
+<Tip>
+  **File Naming**: Use descriptive names (e.g., `ayudantia_03_sql_joins.pdf`) to help students identify content.
+</Tip>
+
+<Tip>
+  **ZIP for Code**: If uploading code examples, compress into a ZIP file with clear folder structure.
+</Tip>
+
+### Video URL Guidelines
+
+<Note>
+  **Supported Platforms:**
+  - YouTube (most common)
+  - Vimeo
+  - Any public URL (embedded or linked)
+  
+  Ensure videos are set to "Public" or "Unlisted" (not Private).
+</Note>
+
+<Tip>
+  Use YouTube playlists to organize all session recordings for a subject, then link individual videos in each ayudantía.
+</Tip>
+
+### Description Formatting
+
+The description field supports Markdown:
+
+```markdown
+## Temas Cubiertos
+- Consultas SELECT básicas
+- Filtrado con WHERE
+- Ordenamiento con ORDER BY
+
+**Recursos adicionales:**
+[Tutorial SQL](https://example.com)
+```
+
+<Tip>
+  Use headings, lists, and links to make descriptions scannable and useful for students reviewing topics.
+</Tip>
+
+## Workflow Examples
+
+### Starting a New Course
+
+<Steps>
+  <Step title="Create Semester">
+    If a new academic period, create a semester (e.g., "2025-1").
+  </Step>
+  
+  <Step title="Add Subject">
+    Within that semester, add your subject with name and code.
+  </Step>
+  
+  <Step title="Enroll Students">
+    *(If enrollment UI exists)* Bulk enroll students from a CSV.
+  </Step>
+  
+  <Step title="Prepare First Ayudantía">
+    Before your first tutorial session, prepare materials (PDF, code examples).
+  </Step>
+  
+  <Step title="Upload Session">
+    After the session, upload the ayudantía with video recording and materials.
+  </Step>
+</Steps>
+
+### Updating a Session After Feedback
+
+<Steps>
+  <Step title="Receive Feedback">
+    Student reports a typo in the PDF or requests additional examples.
+  </Step>
+  
+  <Step title="Prepare Updated Material">
+    Fix the PDF or create additional resources.
+  </Step>
+  
+  <Step title="Edit Ayudantía">
+    Go to `/dashboard/courses/[subjectId]`, click edit on the session, and upload the new file.
+  </Step>
+  
+  <Step title="Notify Students">
+    *(Optional)* Send an announcement that materials have been updated.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<Accordion title="File upload fails">
+  **Possible Causes:**
+  - File too large (check Supabase Storage limits)
+  - Invalid file type (only PDF/ZIP allowed)
+  - Network timeout
+  
+  **Solution:**
+  - Compress large files
+  - Verify file extension
+  - Retry upload with stable internet
+</Accordion>
+
+<Accordion title="Can't delete a subject">
+  **Possible Causes:**
+  - Ayudantías still linked to the subject
+  - Foreign key constraint in database
+  
+  **Solution:**
+  - Delete all ayudantías for the subject first
+  - Or configure cascade delete in database schema
+</Accordion>
+
+<Accordion title="Sessions not appearing on public page">
+  **Possible Causes:**
+  - Semester is archived (`is_active = false`)
+  - Subject was deleted
+  - Database query filters exclude the session
+  
+  **Solution:**
+  - Verify semester is active
+  - Check that subject still exists
+  - Review database records for the ayudantía
+</Accordion>
+
+## Advanced: Customizing the Course Structure
+
+If you need to extend the course management system:
+
+1. **Add Fields to Subjects**
+   - Modify the `subjects` table in Supabase
+   - Update the subject creation form in `/dashboard/courses/page.tsx`
+   - Add fields to subject cards
+
+2. **Implement Enrollment UI**
+   - Create a new page or modal for enrollment management
+   - Use server actions to insert/delete enrollment records
+   - Display enrolled students in a table
+
+3. **Add Session Categories**
+   - Add a `category` field to `ayudantias` (e.g., "Lecture", "Lab", "Review")
+   - Update `AyudantiaForm` to include category dropdown
+   - Add category filters in `AdminAyudantiaList`
+
+<Note>
+  Always test schema changes in a development environment before applying to production.
+</Note>

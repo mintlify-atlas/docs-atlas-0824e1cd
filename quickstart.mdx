@@ -1,80 +1,268 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart Guide
+description: Get DIDG System running locally in minutes
 ---
 
-## Get started in three steps
+# Quickstart Guide
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+Get DIDG System up and running on your local machine in just a few minutes. This guide will take you from zero to a fully functional development environment.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+This quickstart assumes you have Node.js 20+ and npm installed. If you need help with prerequisites, see the [Installation](/installation) guide.
 </Note>
+
+## Step-by-Step Setup
+
+<Steps>
+  <Step title="Clone the Repository">
+    First, clone the DIDG System repository to your local machine:
+
+    ```bash
+    git clone https://github.com/tu-usuario/didg-system.git
+    cd didg-system/didg-website
+    ```
+
+    <Info>
+    The main application code is located in the `didg-website` directory.
+    </Info>
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all required npm packages:
+
+    ```bash
+    npm install
+    ```
+
+    This will install the following key dependencies:
+    - **Next.js 14**: React framework with App Router
+    - **Supabase**: Database and authentication
+    - **Tailwind CSS**: Styling framework
+    - **Framer Motion**: Animation library
+    - **TypeScript**: Type safety
+    - **Zustand**: State management
+    - **React Hook Form**: Form handling
+
+    The installation typically takes 1-2 minutes depending on your internet connection.
+  </Step>
+
+  <Step title="Set Up Environment Variables">
+    Create a `.env.local` file in the root of the `didg-website` directory with your Supabase and Telegram credentials:
+
+    ```bash .env.local
+    # Supabase Configuration
+    NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+    # Telegram Bot Configuration (Optional for basic features)
+    TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+    TELEGRAM_CHAT_ID=your_telegram_chat_id
+    ```
+
+    <Accordion title="How to get Supabase credentials">
+      1. Go to [supabase.com](https://supabase.com) and create a free account
+      2. Create a new project
+      3. Navigate to **Settings** → **API**
+      4. Copy your **Project URL** (use for `NEXT_PUBLIC_SUPABASE_URL`)
+      5. Copy your **anon/public** key (use for `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
+    </Accordion>
+
+    <Accordion title="How to set up Telegram Bot (Optional)">
+      Telegram integration enables 2FA and real-time notifications:
+
+      1. Open Telegram and search for [@BotFather](https://t.me/botfather)
+      2. Send `/newbot` and follow the prompts
+      3. Copy the bot token (use for `TELEGRAM_BOT_TOKEN`)
+      4. Get your Chat ID:
+         - Send a message to your bot
+         - Visit: `https://api.telegram.org/bot<YourBOTToken>/getUpdates`
+         - Find your `chat_id` in the JSON response
+         - Use this for `TELEGRAM_CHAT_ID`
+
+      <Warning>
+      Without Telegram credentials, 2FA features will be disabled but the core application will still function.
+      </Warning>
+    </Accordion>
+  </Step>
+
+  <Step title="Configure Supabase Database">
+    Set up your Supabase database schema. The application requires the following tables:
+
+    **Core Tables:**
+    - `subjects` - Course subjects
+    - `ayudantias` - Teaching assistant sessions
+    - `extra_resources` - Academic resources
+    - `resource_bookmarks` - User bookmarks
+    - `enrollments` - Student course enrollments
+    - `grades` - Student grades
+    - `projects` - Portfolio projects
+
+    <Info>
+    You can find the complete database schema by exploring the `src/types/supabase.ts` file in the codebase.
+    </Info>
+
+    Enable Row Level Security (RLS) policies to secure your data:
+
+    ```sql
+    -- Example RLS policy for resource_bookmarks
+    ALTER TABLE resource_bookmarks ENABLE ROW LEVEL SECURITY;
+
+    CREATE POLICY "Users can manage their own bookmarks"
+    ON resource_bookmarks
+    FOR ALL
+    USING (auth.uid() = user_id);
+    ```
+  </Step>
+
+  <Step title="Run the Development Server">
+    Start the Next.js development server:
+
+    ```bash
+    npm run dev
+    ```
+
+    You should see output similar to:
+
+    ```bash
+    ▲ Next.js 14.1.0
+    - Local:        http://localhost:3000
+    - Network:      http://192.168.1.x:3000
+
+    ✓ Ready in 2.5s
+    ```
+
+    <Info>
+    The development server supports hot reload, so changes to your code will automatically refresh the browser.
+    </Info>
+  </Step>
+
+  <Step title="Access the Application">
+    Open your browser and navigate to:
+
+    ```
+    http://localhost:3000
+    ```
+
+    You should see the DIDG System homepage with:
+    - Hero section with animated gradient text
+    - Tech stack showcase (TypeScript, Supabase, Node.js, SOLID)
+    - Featured projects section
+    - Material ayudantías section
+    - Interactive code terminal
+    - Charmander mascot (interactive element)
+  </Step>
+
+  <Step title="Test Authentication">
+    To test the authentication system:
+
+    1. Navigate to `/login`
+    2. Create a test user in your Supabase dashboard:
+       - Go to **Authentication** → **Users**
+       - Click **Add user**
+       - Enter email and password
+    3. Log in with your test credentials
+
+    After successful login, you'll be redirected to `/dashboard` where you can access:
+    - Student management
+    - Resource management
+    - Grade uploads
+    - Analytics
+    - Course management
+
+    <Note>
+    The authentication flow uses Supabase Auth with session management. All protected routes are secured via middleware.
+    </Note>
+  </Step>
+</Steps>
+
+## Verify Your Installation
+
+To ensure everything is working correctly, check these features:
+
+<AccordionGroup>
+  <Accordion title="Theme Toggle">
+    Click the theme toggle in the navigation bar to switch between light and dark modes. The theme preference should persist across page reloads.
+  </Accordion>
+
+  <Accordion title="Command Menu">
+    Press `Ctrl+K` (or `Cmd+K` on Mac) to open the command palette. You should be able to search and navigate to different pages.
+  </Accordion>
+
+  <Accordion title="Database Connection">
+    Visit the `/courses` page. If configured correctly, you should see subjects loaded from your Supabase database.
+  </Accordion>
+
+  <Accordion title="Telegram Integration">
+    If you configured Telegram, check the dashboard settings page. You should see your bot status as "Connected".
+  </Accordion>
+</AccordionGroup>
+
+## Common Issues
+
+<Warning>
+If you encounter any issues, check these common problems:
+</Warning>
+
+**Environment variables not loading**
+- Ensure your `.env.local` file is in the correct directory (`didg-website/`)
+- Restart the development server after adding environment variables
+- Check that variable names match exactly (including `NEXT_PUBLIC_` prefix)
+
+**Supabase connection errors**
+- Verify your URL and anon key are correct
+- Check that your Supabase project is active (not paused)
+- Ensure you're using the anon/public key, not the service role key
+
+**Authentication not working**
+- Verify you have at least one user in Supabase Auth
+- Check browser console for error messages
+- Ensure cookies are enabled in your browser
+
+**Build errors**
+- Clear the `.next` folder: `rm -rf .next`
+- Delete `node_modules` and reinstall: `rm -rf node_modules && npm install`
+- Check that you're using Node.js 20 or higher: `node --version`
+
+## Next Steps
+
+Now that you have DIDG System running locally, you can:
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="book" href="/installation">
+    Learn about detailed configuration options and troubleshooting
+  </Card>
+  
+  <Card title="Explore Features" icon="compass">
+    Try out the grade simulator, resource bookmarks, and command menu
+  </Card>
+  
+  <Card title="Customize Themes" icon="palette">
+    Modify Tailwind configuration in `tailwind.config.js`
+  </Card>
+  
+  <Card title="Add Content" icon="plus">
+    Create subjects, ayudantías, and resources through the dashboard
+  </Card>
+</CardGroup>
+
+## Development Commands
+
+Here are the available npm scripts for development:
+
+```bash
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Start production server
+npm run start
+
+# Run ESLint
+npm run lint
+```
+
+<Info>
+For production deployment, see the [Installation](/installation) guide for detailed build and deployment instructions.
+</Info>

@@ -1,0 +1,355 @@
+---
+title: 'Student Guide'
+description: 'Complete guide for students using the DIDG academic management platform'
+icon: 'graduation-cap'
+---
+
+## Welcome to DIDG
+
+The DIDG System is your central hub for accessing course materials, tracking grades, and managing your academic resources. This guide will help you navigate the platform effectively.
+
+## Getting Started
+
+### Logging In
+
+<Steps>
+  <Step title="Navigate to the Login Page">
+    Go to the DIDG platform login page. Students use simplified authentication without 2FA.
+  </Step>
+  
+  <Step title="Enter Your Credentials">
+    Enter your registered email address and password.
+  </Step>
+  
+  <Step title="Access Your Dashboard">
+    Upon successful login, you'll be redirected to `/dashboard` or the public course catalog.
+  </Step>
+</Steps>
+
+<Note>
+  Students do not require two-factor authentication (2FA). The system automatically detects your role and provides direct access.
+</Note>
+
+## Browsing Courses
+
+### Viewing Available Courses
+
+The courses page (`/courses`) displays all active semesters and their associated subjects.
+
+<Steps>
+  <Step title="Navigate to Courses">
+    Click on the "Cursos" or "Centro de Recursos" link from the navigation menu.
+  </Step>
+  
+  <Step title="Browse by Semester">
+    Courses are organized by semester (e.g., "2024-2"). Each semester shows all active subjects.
+  </Step>
+  
+  <Step title="Select a Subject">
+    Click on any subject card to view its ayudantía sessions and materials.
+  </Step>
+</Steps>
+
+### Understanding the Course Card
+
+Each course card displays:
+- **Subject Name**: The full name of the course
+- **Subject Code**: A unique identifier (e.g., "INF-123")
+- **Icon**: A book icon indicating educational content
+- **Description**: Brief overview of available materials
+
+<Tip>
+  Use the breadcrumb navigation at the top of each page to quickly return to the course catalog.
+</Tip>
+
+## Accessing Ayudantía Materials
+
+### Viewing Ayudantía Sessions
+
+When you select a subject, you'll see a timeline of all ayudantía (tutorial) sessions.
+
+**Timeline Features:**
+- Sessions are sorted by date (most recent first)
+- Each session card shows:
+  - Title (e.g., "Ayudantía 1 - SQL")
+  - Date of the session
+  - Description with topics covered (supports Markdown)
+  - Available resources (PDFs, videos)
+
+### Downloading Materials
+
+<Steps>
+  <Step title="Locate the Session">
+    Find the ayudantía session you need on the subject page at `/courses/[subjectId]`.
+  </Step>
+  
+  <Step title="Review Available Resources">
+    Each session may include:
+    - PDF files (lecture notes, guides)
+    - ZIP files (code examples, projects)
+    - Video URLs (YouTube recordings)
+  </Step>
+  
+  <Step title="Download or View">
+    Click the download button for PDFs/ZIPs, or click the video link to watch recordings.
+  </Step>
+</Steps>
+
+<Note>
+  All downloads are tracked for analytics. This helps instructors understand which materials are most valuable.
+</Note>
+
+### Filtering Ayudantías
+
+The `AyudantiaList` component provides filtering options:
+- **Search**: Find sessions by title or description keywords
+- **Filter by Type**: Show only PDFs or only videos
+- **Sort**: Sessions are automatically sorted by date
+
+## Bookmarking Resources
+
+### Saving Ayudantías for Later
+
+Bookmark important sessions to quickly access them from your profile.
+
+<Steps>
+  <Step title="Navigate to an Ayudantía">
+    Open any subject page and locate the session you want to save.
+  </Step>
+  
+  <Step title="Click the Bookmark Icon">
+    Look for the bookmark/save icon on the ayudantía card (only visible when logged in).
+  </Step>
+  
+  <Step title="Access Saved Items">
+    Go to your profile page (`/profile`) to view all bookmarked ayudantías under the "Saved Ayudantías" tab.
+  </Step>
+</Steps>
+
+<Tip>
+  Bookmarks are stored in the `ayudantia_bookmarks` table with your user ID, so they persist across sessions.
+</Tip>
+
+### Bookmarking Extra Resources
+
+Beyond ayudantías, you can also bookmark items from the resource library:
+
+1. Navigate to `/resources`
+2. Browse or search for tools, tutorials, or code snippets
+3. Click the bookmark icon on any resource card
+4. View saved resources in your profile under "Bookmarked Resources"
+
+## Viewing Your Grades
+
+### Accessing the Grades Page
+
+<Steps>
+  <Step title="Navigate to Grades">
+    Click on "Mis Calificaciones" in the navigation menu or go to `/grades`.
+  </Step>
+  
+  <Step title="Review Your Enrollments">
+    The page displays all subjects you're enrolled in. For each subject, you'll see:
+    - Subject name and code
+    - All recorded grades for evaluations (e.g., "Certamen 1")
+    - Current average score
+  </Step>
+  
+  <Step title="Understand Your Performance">
+    Grades are color-coded:
+    - **Green**: Score ≥ 4.0 (passing)
+    - **Red**: Score < 4.0 (needs improvement)
+  </Step>
+</Steps>
+
+### Grade Calculation
+
+- The system fetches grades from the `grades` table linked to your enrollments
+- **Average**: Sum of all scores divided by the number of evaluations
+- **Weight**: Some systems may use weighted averages (check the `weight` field)
+
+<Note>
+  If you see "No hay notas registradas aún," your instructor hasn't uploaded grades for that subject yet.
+</Note>
+
+## Using the Grade Simulator
+
+<Accordion title="What is the Grade Simulator?">
+  The grade simulator (if implemented as a client component) allows you to:
+  - Input hypothetical scores for upcoming evaluations
+  - Calculate projected final grades
+  - Plan how well you need to perform on future exams
+  
+  This feature helps you set realistic academic goals and track progress.
+</Accordion>
+
+<Steps>
+  <Step title="Access the Simulator">
+    Look for a "Simulador de Notas" button or tab on the grades page.
+  </Step>
+  
+  <Step title="Enter Evaluation Data">
+    Input the name, weight, and score for each evaluation (both completed and planned).
+  </Step>
+  
+  <Step title="Calculate Results">
+    The simulator will show your projected final grade based on the weighted average.
+  </Step>
+</Steps>
+
+<Tip>
+  Use the simulator before major exams to understand the minimum score you need to achieve your target grade.
+</Tip>
+
+## Managing Your Profile
+
+### Viewing Profile Information
+
+Your profile page (`/profile`) uses a tabbed interface powered by the `ProfileTabs` component.
+
+**Available Tabs:**
+
+1. **Profile Info**
+   - Full name
+   - RUT (national ID)
+   - Email address
+   - Role (student)
+
+2. **Bookmarked Resources**
+   - All saved items from the resource library
+   - Quick access links to files or URLs
+
+3. **Saved Ayudantías**
+   - All bookmarked tutorial sessions
+   - Direct links to subject pages
+
+<Steps>
+  <Step title="Navigate to Profile">
+    Click your name or profile icon in the navigation menu, or go to `/profile`.
+  </Step>
+  
+  <Step title="Switch Between Tabs">
+    Use the tab navigation to view different sections of your profile.
+  </Step>
+  
+  <Step title="Manage Bookmarks">
+    Remove bookmarks by clicking the unbookmark icon on any saved item.
+  </Step>
+</Steps>
+
+## Navigating the Platform
+
+### Main Navigation Paths
+
+- **Home** (`/`): Landing page with an overview of the platform
+- **Courses** (`/courses`): Browse all active subjects and ayudantías
+- **Resources** (`/resources`): Access the shared resource library
+- **Grades** (`/grades`): View your academic performance
+- **Profile** (`/profile`): Manage bookmarks and view personal info
+- **Projects** (`/projects`): Explore instructor projects and portfolios
+
+### Breadcrumb Navigation
+
+The `Breadcrumbs` component appears at the top of most pages:
+- Shows your current location in the site hierarchy
+- Provides quick links back to parent pages
+- Example: `Cursos > Base de Datos > Ayudantía 3`
+
+<Tip>
+  Use breadcrumbs to quickly navigate back without using the browser's back button.
+</Tip>
+
+## Common UI Elements
+
+### Cards and Hover Effects
+
+Most interactive elements use card-based layouts with hover effects:
+- **Subject Cards**: Lift slightly on hover with a secondary color glow
+- **Ayudantía Cards**: Show action buttons when you hover over them
+- **Resource Cards**: Display edit/delete options for admins, bookmark for students
+
+### Icons and Visual Indicators
+
+- **BookOpen**: Indicates courses and subjects
+- **Calendar**: Shows semester information
+- **Video**: Indicates video content is available
+- **FileText**: Indicates downloadable PDF/ZIP files
+- **Bookmark**: Save/unsave functionality
+
+### Theme Support
+
+The platform supports light and dark modes:
+- Background colors adapt via `bg-surface` and `bg-background`
+- Text colors use `text-text-main` and `text-text-muted`
+- Borders use `border-text-main/10` for theme-aware visibility
+
+## Troubleshooting
+
+<Accordion title="I can't see any courses">
+  **Possible Causes:**
+  - No semesters are marked as active (`is_active = true`)
+  - You're viewing a semester with no subjects assigned
+  - Network or database connection issue
+  
+  **Solution:**
+  Contact your instructor or system administrator to verify course availability.
+</Accordion>
+
+<Accordion title="My bookmarks aren't saving">
+  **Possible Causes:**
+  - You're not logged in (bookmarks require authentication)
+  - Database permissions issue
+  
+  **Solution:**
+  Ensure you're logged in. Try logging out and back in. If the issue persists, contact support.
+</Accordion>
+
+<Accordion title="I don't see my grades">
+  **Possible Causes:**
+  - You're not enrolled in any subjects
+  - Grades haven't been uploaded yet
+  - Enrollment data is missing
+  
+  **Solution:**
+  Check with your instructor to confirm enrollment and grade publication status.
+</Accordion>
+
+<Accordion title="Videos won't play">
+  **Possible Causes:**
+  - Invalid video URL
+  - YouTube link is private or restricted
+  - Browser blocking embedded content
+  
+  **Solution:**
+  Try opening the video URL in a new tab. If it's private, contact the instructor.
+</Accordion>
+
+## Best Practices
+
+<Tip>
+  **Stay Organized**: Bookmark important ayudantías before exam periods so you can quickly review them.
+</Tip>
+
+<Tip>
+  **Check Regularly**: New materials are added throughout the semester. Visit course pages weekly.
+</Tip>
+
+<Tip>
+  **Download Early**: Download materials before exams to ensure you have offline access.
+</Tip>
+
+<Tip>
+  **Use Search**: The search functionality in ayudantía lists helps you quickly find specific topics.
+</Tip>
+
+## Getting Help
+
+If you encounter issues or have questions:
+
+1. Check this documentation first
+2. Contact your instructor via the contact form (`/contact`)
+3. Report technical issues to the system administrator
+
+<Note>
+  The contact form at `/contact` sends messages directly to the instructor, who can view them in the admin dashboard at `/dashboard/messages`.
+</Note>

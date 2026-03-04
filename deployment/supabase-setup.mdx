@@ -1,0 +1,929 @@
+---
+title: Supabase Setup
+description: Complete guide to setting up Supabase for production deployment of the DIDG System
+---
+
+## Overview
+
+This guide walks through setting up a production Supabase project for the DIDG System, including database schema, authentication, Row Level Security policies, and storage configuration.
+
+## Prerequisites
+
+- Supabase account ([sign up free](https://app.supabase.com))
+- Supabase CLI installed (optional but recommended)
+- Access to the DIDG System source code
+
+---
+
+## Step 1: Create Supabase Project
+
+### Via Dashboard
+
+1. **Log in** to [Supabase Dashboard](https://app.supabase.com)
+2. Click **New Project**
+3. **Configure project**:
+   - **Name**: `didg-production` (or your preferred name)
+   - **Database Password**: Generate a strong password (save this securely)
+   - **Region**: Choose closest to your users (e.g., `South America (São Paulo)` for Chile)
+   - **Pricing Plan**: Free or Pro based on needs
+4. Click **Create new project**
+5. Wait 2-3 minutes for provisioning
+
+### Get API Credentials
+
+Once project is ready:
+
+1. Go to **Settings** > **API**
+2. Copy these values (you'll need them later):
+   - **Project URL**: `https://your-project-id.supabase.co`
+   - **anon public** key
+   - **service_role secret** key (click to reveal)
+
+<Warning>
+Store the service role key securely. It bypasses all security policies and should never be exposed in client-side code.
+</Warning>
+
+---
+
+## Step 2: Configure Authentication
+
+### Email Authentication
+
+1. Go to **Authentication** > **Providers**
+2. **Email** should be enabled by default
+3. Configure settings:
+   - **Enable Email Confirmations**: Recommended for production
+   - **Enable Email Change Confirmations**: Recommended
+   - **Enable Password Recovery**: Enabled
+
+### Email Templates
+
+Customize email templates for branding:
+
+1. Go to **Authentication** > **Email Templates**
+2. Customize these templates:
+   - **Confirm signup**: Welcome email with verification link
+   - **Reset password**: Password reset email
+   - **Magic Link**: Passwordless login (if using)
+
+**Example template customization**:
+```html
+<h2>Bienvenido a DIDG</h2>
+<p>Haz clic en el siguiente enlace para confirmar tu cuenta:</p>
+<p><a href="{{ .ConfirmationURL }}">Confirmar cuenta</a></p>
+<p>Este enlace expira en 24 horas.</p>
+```
+
+### SMTP Configuration (Optional)
+
+For production email sending:
+
+1. Go to **Settings** > **Auth** > **SMTP Settings**
+2. Configure your SMTP provider (e.g., SendGrid, AWS SES)
+3. **Example with SendGrid**:
+   - **Host**: `smtp.sendgrid.net`
+   - **Port**: `587`
+   - **Username**: `apikey`
+   - **Password**: Your SendGrid API key
+   - **Sender email**: `noreply@yourdomain.com`
+   - **Sender name**: `DIDG System`
+
+<Note>
+Without SMTP configuration, Supabase uses their default email service which may have rate limits and deliverability issues.
+</Note>
+
+### Authentication Settings
+
+1. Go to **Authentication** > **Settings**
+2. Configure:
+   - **Site URL**: `https://your-domain.com` (your production URL)
+   - **Redirect URLs**: Add authorized redirect URLs:
+     - `https://your-domain.com/**`
+     - `http://localhost:3000/**` (for development)
+   - **JWT Expiry**: `3600` (1 hour, recommended)
+   - **Disable Signup**: `false` (allow new registrations)
+
+---
+
+## Step 3: Database Schema Setup
+
+The DIDG System requires specific tables, relationships, and triggers. See [Database Schema](/architecture/database-schema) for complete reference.
+
+### Option A: Manual Setup via SQL Editor
+
+1. Go to **SQL Editor** in Supabase Dashboard
+2. Create a new query
+3. Copy and execute the following SQL:
+
+```sql
+-- =============================================================================
+-- DIDG SYSTEM DATABASE SCHEMA
+-- Complete production setup for academic management platform
+-- =============================================================================
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- =============================================================================
+-- CORE TABLES
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- Semesters Table
+-- Stores academic semesters/periods
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.semesters (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Only one active semester at a time
+CREATE UNIQUE INDEX idx_active_semester ON public.semesters (is_active) WHERE is_active = true;
+
+-- -----------------------------------------------------------------------------
+-- Profiles Table
+-- User profiles synchronized with auth.users
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    full_name TEXT NOT NULL,
+    rut TEXT UNIQUE NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('student', 'admin')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX idx_profiles_role ON public.profiles(role);
+CREATE INDEX idx_profiles_email ON public.profiles(email);
+
+-- -----------------------------------------------------------------------------
+-- Subjects Table
+-- Academic courses/subjects
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.subjects (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    code TEXT NOT NULL,
+    semester_id UUID REFERENCES public.semesters(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_subjects_semester ON public.subjects(semester_id);
+
+-- -----------------------------------------------------------------------------
+-- Enrollments Table
+-- Links students to subjects
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.enrollments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    student_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    subject_id UUID REFERENCES public.subjects(id) ON DELETE CASCADE,
+    enrolled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(student_id, subject_id)
+);
+
+CREATE INDEX idx_enrollments_student ON public.enrollments(student_id);
+CREATE INDEX idx_enrollments_subject ON public.enrollments(subject_id);
+
+-- -----------------------------------------------------------------------------
+-- Grades Table
+-- Student evaluations and scores
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.grades (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    enrollment_id UUID REFERENCES public.enrollments(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    score FLOAT NOT NULL,
+    weight FLOAT DEFAULT 1.0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_grades_enrollment ON public.grades(enrollment_id);
+
+-- -----------------------------------------------------------------------------
+-- Ayudantias Table
+-- Teaching assistant sessions/tutorials
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.ayudantias (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    subject_id UUID REFERENCES public.subjects(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT,
+    date TEXT,
+    video_url TEXT,
+    material_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_ayudantias_subject ON public.ayudantias(subject_id);
+
+-- =============================================================================
+-- RESOURCE MANAGEMENT
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- Extra Resources Table
+-- Supplementary learning resources
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.extra_resources (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT NOT NULL,
+    description TEXT,
+    url TEXT,
+    category TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_resources_category ON public.extra_resources(category);
+
+-- -----------------------------------------------------------------------------
+-- Resource Bookmarks Table
+-- User bookmarks for resources
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.resource_bookmarks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    resource_id UUID REFERENCES public.extra_resources(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, resource_id)
+);
+
+CREATE INDEX idx_bookmarks_user ON public.resource_bookmarks(user_id);
+CREATE INDEX idx_bookmarks_resource ON public.resource_bookmarks(resource_id);
+
+-- =============================================================================
+-- AUTHENTICATION & SECURITY
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- Verification Codes Table
+-- 2FA verification codes for admin login
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.verification_codes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email TEXT NOT NULL,
+    code TEXT NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_verification_email ON public.verification_codes(email);
+CREATE INDEX idx_verification_expires ON public.verification_codes(expires_at);
+
+-- =============================================================================
+-- DATABASE TRIGGERS
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- Auto-create profile on user signup
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.profiles (id, email, full_name, rut, role)
+    VALUES (
+        NEW.id,
+        NEW.email,
+        COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
+        COALESCE(NEW.raw_user_meta_data->>'rut', ''),
+        COALESCE(NEW.raw_user_meta_data->>'role', 'student')
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_new_user();
+
+-- -----------------------------------------------------------------------------
+-- Auto-update timestamp on table updates
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS subjects_updated_at ON public.subjects;
+CREATE TRIGGER subjects_updated_at
+    BEFORE UPDATE ON public.subjects
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_updated_at();
+
+DROP TRIGGER IF EXISTS ayudantias_updated_at ON public.ayudantias;
+CREATE TRIGGER ayudantias_updated_at
+    BEFORE UPDATE ON public.ayudantias
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_updated_at();
+
+-- =============================================================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- =============================================================================
+
+-- Enable RLS on all tables
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.semesters ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.enrollments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.grades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ayudantias ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.extra_resources ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.resource_bookmarks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.verification_codes ENABLE ROW LEVEL SECURITY;
+
+-- -----------------------------------------------------------------------------
+-- Profiles Policies
+-- -----------------------------------------------------------------------------
+CREATE POLICY "Users can view their own profile"
+    ON public.profiles FOR SELECT
+    USING (auth.uid() = id);
+
+CREATE POLICY "Admins can view all profiles"
+    ON public.profiles FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
+CREATE POLICY "Users can update their own profile"
+    ON public.profiles FOR UPDATE
+    USING (auth.uid() = id);
+
+-- -----------------------------------------------------------------------------
+-- Semesters Policies
+-- -----------------------------------------------------------------------------
+CREATE POLICY "Anyone can view semesters"
+    ON public.semesters FOR SELECT
+    TO authenticated
+    USING (true);
+
+CREATE POLICY "Only admins can modify semesters"
+    ON public.semesters FOR ALL
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
+-- -----------------------------------------------------------------------------
+-- Subjects Policies
+-- -----------------------------------------------------------------------------
+CREATE POLICY "Anyone can view subjects"
+    ON public.subjects FOR SELECT
+    TO authenticated
+    USING (true);
+
+CREATE POLICY "Only admins can modify subjects"
+    ON public.subjects FOR ALL
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
+-- -----------------------------------------------------------------------------
+-- Enrollments Policies
+-- -----------------------------------------------------------------------------
+CREATE POLICY "Students can view their own enrollments"
+    ON public.enrollments FOR SELECT
+    USING (auth.uid() = student_id);
+
+CREATE POLICY "Admins can view all enrollments"
+    ON public.enrollments FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
+-- Note: INSERT/UPDATE/DELETE handled via admin client (service role)
+
+-- -----------------------------------------------------------------------------
+-- Grades Policies
+-- -----------------------------------------------------------------------------
+CREATE POLICY "Students can view their own grades"
+    ON public.grades FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.enrollments
+            WHERE enrollments.id = grades.enrollment_id
+            AND enrollments.student_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Admins can view all grades"
+    ON public.grades FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
+-- Note: INSERT/UPDATE/DELETE handled via admin client (service role)
+
+-- -----------------------------------------------------------------------------
+-- Ayudantias Policies
+-- -----------------------------------------------------------------------------
+CREATE POLICY "Anyone can view ayudantias"
+    ON public.ayudantias FOR SELECT
+    TO authenticated
+    USING (true);
+
+CREATE POLICY "Only admins can modify ayudantias"
+    ON public.ayudantias FOR ALL
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
+-- -----------------------------------------------------------------------------
+-- Extra Resources Policies
+-- -----------------------------------------------------------------------------
+CREATE POLICY "Anyone can view resources"
+    ON public.extra_resources FOR SELECT
+    TO authenticated
+    USING (true);
+
+CREATE POLICY "Only admins can modify resources"
+    ON public.extra_resources FOR ALL
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.profiles
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
+-- -----------------------------------------------------------------------------
+-- Resource Bookmarks Policies
+-- -----------------------------------------------------------------------------
+CREATE POLICY "Users can view their own bookmarks"
+    ON public.resource_bookmarks FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create their own bookmarks"
+    ON public.resource_bookmarks FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own bookmarks"
+    ON public.resource_bookmarks FOR DELETE
+    USING (auth.uid() = user_id);
+
+-- -----------------------------------------------------------------------------
+-- Verification Codes Policies
+-- -----------------------------------------------------------------------------
+-- Note: Access controlled via admin client (service role) only
+-- No RLS policies needed as regular users never access this table
+
+-- =============================================================================
+-- INITIAL DATA
+-- =============================================================================
+
+-- Create initial active semester
+INSERT INTO public.semesters (name, is_active)
+VALUES ('2025-1', true)
+ON CONFLICT DO NOTHING;
+
+-- =============================================================================
+-- COMPLETION
+-- =============================================================================
+
+-- Verify schema
+DO $$
+DECLARE
+    table_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO table_count
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+    AND table_name IN (
+        'profiles', 'semesters', 'subjects', 'enrollments',
+        'grades', 'ayudantias', 'extra_resources',
+        'resource_bookmarks', 'verification_codes'
+    );
+    
+    IF table_count = 9 THEN
+        RAISE NOTICE 'Schema setup complete! All 9 tables created successfully.';
+    ELSE
+        RAISE WARNING 'Schema setup incomplete. Expected 9 tables, found %', table_count;
+    END IF;
+END $$;
+```
+
+4. Click **Run** or press `Ctrl+Enter`
+5. Verify success message: "Schema setup complete! All 9 tables created successfully."
+
+### Option B: Using Supabase CLI
+
+```bash
+# Save SQL to file
+cat > schema.sql << 'EOF'
+# [Paste SQL from above]
+EOF
+
+# Apply to project
+supabase db push --project-ref your-project-id
+```
+
+### Verify Schema
+
+1. Go to **Table Editor**
+2. Verify these tables exist:
+   - `profiles`
+   - `semesters`
+   - `subjects`
+   - `enrollments`
+   - `grades`
+   - `ayudantias`
+   - `extra_resources`
+   - `resource_bookmarks`
+   - `verification_codes`
+
+---
+
+## Step 4: Storage Buckets
+
+Create storage buckets for file uploads.
+
+### Create course-materials Bucket
+
+1. Go to **Storage**
+2. Click **New bucket**
+3. Configure:
+   - **Name**: `course-materials`
+   - **Public bucket**: `false` (private)
+   - **File size limit**: `52428800` (50 MB)
+   - **Allowed MIME types**: Leave empty (allow all)
+4. Click **Create bucket**
+
+### Configure Storage Policies
+
+1. Click on the `course-materials` bucket
+2. Go to **Policies** tab
+3. Click **New policy**
+
+**Policy 1: Authenticated users can read files**
+```sql
+CREATE POLICY "Authenticated users can view course materials"
+ON storage.objects FOR SELECT
+TO authenticated
+USING (bucket_id = 'course-materials');
+```
+
+**Policy 2: Admins can upload files**
+```sql
+CREATE POLICY "Admins can upload course materials"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+    bucket_id = 'course-materials'
+    AND (
+        EXISTS (
+            SELECT 1 FROM public.profiles
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    )
+);
+```
+
+**Policy 3: Admins can delete files**
+```sql
+CREATE POLICY "Admins can delete course materials"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (
+    bucket_id = 'course-materials'
+    AND (
+        EXISTS (
+            SELECT 1 FROM public.profiles
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    )
+);
+```
+
+<Note>
+The application generates signed URLs for temporary file access, so the bucket can remain private.
+</Note>
+
+---
+
+## Step 5: Generate TypeScript Types
+
+Generate TypeScript types from your database schema.
+
+### Install Supabase CLI
+
+```bash
+npm install -g supabase
+```
+
+### Login to Supabase
+
+```bash
+supabase login
+```
+
+### Generate Types
+
+```bash
+# Navigate to project root
+cd didg-website
+
+# Generate types
+supabase gen types typescript --project-id YOUR_PROJECT_ID > src/types/supabase.ts
+```
+
+Replace `YOUR_PROJECT_ID` with your project ID from the Supabase URL:
+- URL: `https://abcdefghijklmnop.supabase.co`
+- Project ID: `abcdefghijklmnop`
+
+### Verify Types
+
+Check `src/types/supabase.ts` contains interfaces for all tables:
+```typescript
+export interface Database {
+  public: {
+    Tables: {
+      profiles: { ... }
+      subjects: { ... }
+      enrollments: { ... }
+      // ... etc
+    }
+  }
+}
+```
+
+---
+
+## Step 6: Create Admin Account
+
+Create your first admin user.
+
+### Via Supabase Dashboard
+
+1. Go to **Authentication** > **Users**
+2. Click **Add user** > **Create new user**
+3. Enter:
+   - **Email**: Your admin email
+   - **Password**: Strong password
+   - **Auto Confirm User**: Check this box
+4. Click **Create user**
+5. Note the **User UID** (copy it)
+
+### Set Admin Role
+
+1. Go to **SQL Editor**
+2. Run this query:
+
+```sql
+-- Update user metadata to set admin role
+UPDATE auth.users
+SET raw_user_meta_data = raw_user_meta_data || '{"role": "admin", "full_name": "Your Name", "rut": "12345678-9"}'::jsonb
+WHERE id = 'USER_UID_HERE';
+
+-- Manually create profile if needed
+INSERT INTO public.profiles (id, email, full_name, rut, role)
+VALUES (
+  'USER_UID_HERE',
+  'your-email@example.com',
+  'Your Name',
+  '12345678-9',
+  'admin'
+)
+ON CONFLICT (id) DO UPDATE
+SET role = 'admin';
+```
+
+Replace:
+- `USER_UID_HERE` with the User UID you copied
+- `your-email@example.com` with your email
+- `Your Name` with your name
+- `12345678-9` with a valid RUT
+
+---
+
+## Step 7: Configure Vercel Environment Variables
+
+Add Supabase credentials to Vercel:
+
+1. Go to **Vercel Dashboard** > Your Project > **Settings** > **Environment Variables**
+2. Add these variables:
+
+| Variable | Value | Environment |
+|----------|-------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://your-project.supabase.co` | Production, Preview, Development |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your anon key | Production, Preview, Development |
+| `SUPABASE_SERVICE_ROLE_KEY` | Your service role key | Production, Preview, Development |
+
+3. Click **Save**
+4. Redeploy your application
+
+---
+
+## Step 8: Verification Steps
+
+### Test Authentication
+
+1. Visit your deployed application
+2. Click **Login**
+3. Enter admin credentials
+4. Verify successful login and admin dashboard access
+
+### Test Database Connection
+
+Create a test API endpoint:
+
+```typescript
+// app/api/test-db/route.ts
+import { createClient } from '@/infrastructure/supabase/server'
+
+export async function GET() {
+  const supabase = await createClient()
+  const { data, error } = await supabase.from('profiles').select('count')
+  
+  if (error) {
+    return Response.json({ error: error.message }, { status: 500 })
+  }
+  
+  return Response.json({ success: true, profiles: data })
+}
+```
+
+Visit `/api/test-db` and verify response.
+
+### Test Storage
+
+1. Login as admin
+2. Navigate to a course/ayudantia
+3. Try uploading a file
+4. Verify file appears and can be downloaded
+
+### Verify RLS Policies
+
+1. Login as a student (non-admin)
+2. Try accessing admin features (should be denied)
+3. Verify students can only see their own grades
+4. Check student can view public resources
+
+---
+
+## Maintenance and Backups
+
+### Automatic Backups
+
+**Free Tier**: Daily backups, 7-day retention
+**Pro Tier**: Hourly backups, point-in-time recovery
+
+1. Go to **Database** > **Backups**
+2. View backup history
+3. Download backups if needed
+
+### Manual Backup
+
+```bash
+# Backup database
+supabase db dump --project-id YOUR_PROJECT_ID > backup.sql
+
+# Backup storage
+supabase storage download course-materials --project-id YOUR_PROJECT_ID
+```
+
+### Restore from Backup
+
+1. Go to **Database** > **Backups**
+2. Find the backup point
+3. Click **Restore**
+4. Confirm restoration (creates new project)
+
+<Warning>
+Restoring a backup creates a new project. You'll need to update environment variables in Vercel.
+</Warning>
+
+---
+
+## Monitoring and Optimization
+
+### Database Performance
+
+1. Go to **Database** > **Query Performance**
+2. Review slow queries
+3. Add indexes as needed
+
+**Common indexes to add**:
+```sql
+-- If grade queries are slow
+CREATE INDEX idx_grades_enrollment_created ON grades(enrollment_id, created_at DESC);
+
+-- If enrollment lookups are slow
+CREATE INDEX idx_enrollments_student_subject ON enrollments(student_id, subject_id);
+```
+
+### API Usage
+
+1. Go to **Project Settings** > **Usage**
+2. Monitor:
+   - Database size
+   - Storage usage
+   - Bandwidth
+   - API requests
+
+### Upgrade Considerations
+
+**Free Tier Limits**:
+- 500 MB database
+- 1 GB file storage
+- 2 GB bandwidth/month
+- 50,000 monthly active users
+
+**When to upgrade to Pro ($25/mo)**:
+- Database > 500 MB
+- Need hourly backups
+- Point-in-time recovery
+- Need 8 GB database
+- Higher bandwidth requirements
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue**: "Invalid API key"
+
+**Solution**: 
+- Verify environment variables in Vercel
+- Ensure you copied the correct keys from Supabase Dashboard
+- Redeploy application after adding variables
+
+---
+
+**Issue**: "Row Level Security policy violation"
+
+**Solution**:
+- Check if RLS policies are properly configured
+- Verify user role is set correctly in `profiles` table
+- For admin operations, ensure using `createAdminClient()` not regular client
+
+---
+
+**Issue**: "Storage object not found"
+
+**Solution**:
+- Verify bucket name is exactly `course-materials`
+- Check storage policies allow read access
+- Ensure file was uploaded successfully
+- Try generating signed URL instead of public URL
+
+---
+
+**Issue**: "Profile not created on signup"
+
+**Solution**:
+- Check trigger `on_auth_user_created` exists: `\df handle_new_user` in SQL editor
+- Verify user metadata contains `full_name`, `rut`, `role`
+- Manually create profile for existing users
+
+---
+
+## Security Checklist
+
+Before going live:
+
+- [ ] RLS enabled on all tables
+- [ ] Service role key stored securely in Vercel (not in code)
+- [ ] Storage buckets have proper access policies
+- [ ] Email confirmation enabled for signups
+- [ ] SMTP configured for production emails
+- [ ] Database backups enabled
+- [ ] Unused auth providers disabled
+- [ ] SQL injection protection verified (parameterized queries)
+- [ ] Rate limiting considered for sensitive operations
+- [ ] Admin accounts use strong passwords
+- [ ] Test accounts removed from production
+
+---
+
+## Related Documentation
+
+- [Database Schema](/architecture/database-schema) - Complete schema reference
+- [Environment Variables](/deployment/environment-variables) - All environment variables
+- [Deployment Overview](/deployment/overview) - Full deployment guide
+- [Security](/architecture/security) - Security implementation details

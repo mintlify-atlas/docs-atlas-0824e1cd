@@ -1,0 +1,365 @@
+---
+title: "Authentication System"
+description: "Secure login with Supabase Auth, 2FA via Telegram, and role-based access control"
+icon: "shield-check"
+---
+
+## Overview
+
+DIDG System implements a multi-layered authentication system that combines Supabase Auth with two-factor authentication (2FA) via Telegram for admin users, while providing seamless access for students.
+
+<Note>
+  **Security First**: Admin accounts require 2FA verification via Telegram, while student accounts get direct access for better UX.
+</Note>
+
+## Authentication Flow
+
+The system uses a bifurcated authentication flow based on user roles:
+
+<Steps>
+  <Step title="Initial Credential Validation">
+    User submits email and password. The system validates credentials against Supabase Auth.
+  </Step>
+  
+  <Step title="Role Detection">
+    System queries the `profiles` table to determine if the user is a student or admin.
+  </Step>
+  
+  <Step title="Access Decision">
+    - **Students**: Direct redirect to dashboard
+    - **Admins**: Session terminated, 2FA code generated and sent via Telegram
+  </Step>
+  
+  <Step title="2FA Verification (Admins Only)">
+    Admin enters the 6-digit code received on Telegram to complete authentication.
+  </Step>
+</Steps>
+
+## Implementation Details
+
+### Login Initiation
+
+The `initiateLogin` function handles the first phase of authentication:
+
+<ParamField path="email" type="string" required>
+  User's email address
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  User's password
+</ParamField>
+
+**Source:** `auth-2fa.ts:9-106`
+
+```typescript
+export async function initiateLogin(prevState: any, formData: FormData) {
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+  const supabase = await createClient();
+  const adminDb = createAdminClient();
+
+  // Validate credentials
+  const response = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (response.error) {
+    if (response.error.status === 429) {
+      return { error: "⚠️ Too many attempts. Please wait 60 seconds." };
+    }
+    return { error: "Invalid credentials" };
+  }
+
+  // Get user role
+  const { data: profile } = await adminDb
+    .from("profiles")
+    .select("role")
+    .eq("id", authData.user.id)
+    .single();
+
+  // STUDENT: Direct access
+  if (profile?.role === "student") {
+    redirect("/dashboard");
+  }
+
+  // ADMIN: Require 2FA
+  await supabase.auth.signOut();
+  // ... Generate and send 2FA code
+}
+```
+
+<ResponseField name="step" type="string">
+  Returns `"verify_2fa"` for admins, redirects students directly
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  Preserved email for the 2FA step
+</ResponseField>
+
+<ResponseField name="password" type="string">
+  Preserved password for final authentication
+</ResponseField>
+
+### Two-Factor Authentication
+
+For admin users, the system generates a 6-digit code with 5-minute expiration:
+
+**Code Generation** (`auth-2fa.ts:67`)
+```typescript
+const code = Math.floor(100000 + Math.random() * 900000).toString();
+```
+
+**Storage** (`auth-2fa.ts:70-76`)
+- Stored in `verification_codes` table
+- Old codes for the same email are deleted before insertion
+- Expiration set to 5 minutes from generation
+
+**Telegram Notification** (`auth-2fa.ts:81-102`)
+```typescript
+const message = `🛡️ <b>2FA ACCESS REQUEST</b>\n` +
+                `──────────────────\n\n` +
+                `👤 <b>Credentials:</b>\n` +
+                `├ <b>User:</b> <code>${email}</code>\n` +
+                `└ <b>Level:</b> ${roleIcon} ${profile?.role?.toUpperCase()}\n\n` +
+                `🔑 <b>YOUR ACCESS CODE:</b>\n` +
+                `👉 <code>${code}</code> 👈\n\n` +
+                `──────────────────\n` +
+                `⚠️ <i>This code expires shortly. If this wasn't you, secure your account immediately.</i>\n` +
+                `📅 ${date}`;
+
+await sendTelegramMessage(message);
+```
+
+### Completing 2FA Login
+
+The `completeLogin` function validates the 2FA code:
+
+<ParamField path="email" type="string" required>
+  User's email address
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  User's password
+</ParamField>
+
+<ParamField path="code" type="string" required>
+  6-digit verification code from Telegram
+</ParamField>
+
+**Validation Logic** (`auth-2fa.ts:117-131`)
+```typescript
+const { data: record } = await adminDb
+  .from("verification_codes")
+  .select("*")
+  .eq("email", email)
+  .eq("code", code)
+  .single();
+
+if (!record) {
+  return { error: "Invalid code", step: "verify_2fa", email, password };
+}
+
+if (new Date(record.expires_at) < new Date()) {
+  return { error: "Code has expired", step: "verify_2fa", email, password };
+}
+```
+
+<Warning>
+  The verification code is deleted immediately after validation to prevent reuse.
+</Warning>
+
+## Rate Limiting
+
+The system handles Supabase Auth rate limits (HTTP 429) gracefully:
+
+```typescript
+if (response.error.status === 429) {
+  return { error: "⚠️ Too many attempts. Please wait 60 seconds." };
+}
+```
+
+**Applies to:**
+- Initial login attempts
+- 2FA completion attempts
+- Network errors during authentication
+
+## Session Management
+
+DIDG uses Supabase's built-in session management:
+
+### Sign Out
+
+**Source:** `auth.ts:7-18`
+
+```typescript
+export async function signOutAction() {
+  const supabase = await createClient();
+  
+  await supabase.auth.signOut();
+  revalidatePath("/", "layout");
+  redirect("/");
+}
+```
+
+### Password Change
+
+**Source:** `auth.ts:39-73`
+
+<ParamField path="currentPassword" type="string" required>
+  User's current password for verification
+</ParamField>
+
+<ParamField path="newPassword" type="string" required>
+  New password to set
+</ParamField>
+
+```typescript
+export async function changePassword(currentPassword: string, newPassword: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user || !user.email) {
+    return { error: "No active session." };
+  }
+
+  // Verify current password
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword
+  });
+
+  if (verifyError) {
+    return { error: "Current password is incorrect." };
+  }
+
+  // Update to new password
+  const { error: updateError } = await supabase.auth.updateUser({
+    password: newPassword
+  });
+
+  if (updateError) {
+    return { error: updateError.message };
+  }
+
+  revalidatePath("/", "layout");
+  return { success: true };
+}
+```
+
+## Role-Based Access Control
+
+<Tabs>
+  <Tab title="Student Role">
+    **Permissions:**
+    - Access to enrolled courses
+    - View teaching assistant sessions (ayudantías)
+    - Download course materials
+    - Bookmark resources
+    - Track personal progress
+
+    **Authentication:**
+    - Email + Password only
+    - No 2FA required
+    - Direct dashboard access
+  </Tab>
+  
+  <Tab title="Admin Role">
+    **Permissions:**
+    - All student permissions
+    - Create/edit/delete courses
+    - Manage teaching sessions
+    - Upload resources
+    - Manage semesters and subjects
+    - Access admin dashboard
+
+    **Authentication:**
+    - Email + Password
+    - **2FA via Telegram required**
+    - Code expiration: 5 minutes
+  </Tab>
+</Tabs>
+
+## Security Best Practices
+
+1. **Session Termination**: Admin sessions are explicitly terminated before 2FA to prevent session hijacking
+2. **Code Expiration**: All 2FA codes expire after 5 minutes
+3. **Code Cleanup**: Old verification codes are deleted before new ones are generated
+4. **Single Use**: Codes are deleted immediately after successful verification
+5. **Rate Limiting**: Built-in protection against brute force attacks
+6. **Password Verification**: Password changes require current password confirmation
+
+## Error Handling
+
+<Tabs>
+  <Tab title="Login Errors">
+    | Error | Message | Action |
+    |-------|---------|--------|
+    | Invalid credentials | "Invalid credentials" | Check email/password |
+    | Rate limited | "⚠️ Too many attempts. Please wait 60 seconds." | Wait and retry |
+    | Network error | "Connection error with authentication service." | Check connection |
+  </Tab>
+  
+  <Tab title="2FA Errors">
+    | Error | Message | Action |
+    |-------|---------|--------|
+    | Invalid code | "Invalid code" | Re-enter code |
+    | Expired code | "Code has expired" | Request new login |
+    | Telegram failure | Logged to console | Code still generated |
+  </Tab>
+</Tabs>
+
+<Note>
+  Telegram send failures don't block the login process - they're logged but the 2FA code is still generated and stored.
+</Note>
+
+## Database Schema
+
+### Profiles Table
+```sql
+profiles {
+  id: uuid (FK to auth.users)
+  role: text ('student' | 'admin')
+  ... other profile fields
+}
+```
+
+### Verification Codes Table
+```sql
+verification_codes {
+  id: uuid (PK)
+  email: text
+  code: text (6 digits)
+  expires_at: timestamp
+  created_at: timestamp
+}
+```
+
+## Integration Example
+
+```tsx
+import { initiateLogin, completeLogin } from '@/core/actions/auth-2fa';
+import { signOutAction } from '@/core/actions/auth';
+
+// Login form submission
+const handleLogin = async (formData: FormData) => {
+  const result = await initiateLogin(null, formData);
+  
+  if (result.step === 'verify_2fa') {
+    // Show 2FA input form
+    setShow2FA(true);
+  }
+  // Students are redirected automatically
+};
+
+// 2FA verification
+const handle2FA = async (formData: FormData) => {
+  await completeLogin(null, formData);
+  // Redirects to dashboard on success
+};
+
+// Logout
+const handleLogout = async () => {
+  await signOutAction();
+};
+```

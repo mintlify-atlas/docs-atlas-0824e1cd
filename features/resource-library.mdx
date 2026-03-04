@@ -1,0 +1,515 @@
+---
+title: "Resource Library"
+description: "Comprehensive resource management with tags, bookmarks, filtering, and download tracking"
+icon: "book-bookmark"
+---
+
+## Overview
+
+The Resource Library is a centralized hub for educational materials, documentation, and learning resources. Students can discover, bookmark, and organize resources while administrators manage the entire catalog.
+
+<CardGroup cols={2}>
+  <Card title="Smart Filtering" icon="filter">
+    Filter by category, tags, and subjects to find exactly what you need
+  </Card>
+  <Card title="Personal Bookmarks" icon="bookmark">
+    Save favorites and build your personal learning library
+  </Card>
+  <Card title="Multi-Format Support" icon="file">
+    Upload files or link to external resources
+  </Card>
+  <Card title="Tag System" icon="tags">
+    Organize with flexible tagging for better discoverability
+  </Card>
+</CardGroup>
+
+## Resource Management (Admin)
+
+### Create or Update Resource
+
+**Source:** `admin-resources.ts:7-64`
+
+Admins can create resources with files, external links, or both.
+
+<ParamField path="id" type="string (uuid)" optional>
+  If provided, updates existing resource. Otherwise creates new one.
+</ParamField>
+
+<ParamField path="title" type="string" required>
+  Resource title
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Detailed description of the resource content
+</ParamField>
+
+<ParamField path="category" type="string" required>
+  Resource category (e.g., "Documentation", "Tutorial", "Reference")
+</ParamField>
+
+<ParamField path="tags" type="string" required>
+  Comma-separated tags (e.g., "react, hooks, frontend")
+  
+  Automatically trimmed and filtered to remove empty values
+</ParamField>
+
+<ParamField path="external_url" type="string (URL)" optional>
+  Link to external resource (GitHub, documentation site, etc.)
+</ParamField>
+
+<ParamField path="file" type="File" optional>
+  File to upload (PDF, slides, code examples, etc.)
+</ParamField>
+
+<ParamField path="existing_file_url" type="string" optional>
+  For updates: preserve existing file if no new file is uploaded
+</ParamField>
+
+```typescript
+export async function saveResource(formData: FormData) {
+  const supabase = await createClient();
+
+  const id = formData.get("id") as string | null;
+  const title = formData.get("title") as string;
+  const description = formData.get("description") as string;
+  const category = formData.get("category") as string;
+  const external_url = formData.get("external_url") as string;
+  const tagsString = formData.get("tags") as string;
+  
+  // Convert tags from string to array
+  const tags = tagsString.split(",").map(t => t.trim()).filter(t => t.length > 0);
+
+  // Handle file upload
+  const file = formData.get("file") as File | null;
+  let file_url = formData.get("existing_file_url") as string | null;
+
+  if (file && file.size > 0) {
+    const fileName = `${Date.now()}_${file.name.replaceAll(" ", "_")}`;
+    const { error: uploadError } = await supabase.storage
+      .from("materials")
+      .upload(fileName, file);
+
+    if (uploadError) throw new Error("Error uploading file");
+    file_url = fileName;
+  }
+
+  const payload = {
+    title,
+    description,
+    category,
+    tags,
+    external_url: external_url || null,
+    file_url: file_url || null,
+  };
+
+  let error;
+  if (id) {
+    // UPDATE
+    const { error: updateError } = await supabase
+      .from("extra_resources")
+      .update(payload)
+      .eq("id", id);
+    error = updateError;
+  } else {
+    // CREATE
+    const { error: insertError } = await supabase
+      .from("extra_resources")
+      .insert(payload);
+    error = insertError;
+  }
+
+  if (error) {
+    console.error(error);
+    return { ok: false, message: "Error saving to database" };
+  }
+
+  revalidatePath("/resources");
+  revalidatePath("/dashboard/resources");
+  return { ok: true };
+}
+```
+
+<ResponseField name="ok" type="boolean">
+  Indicates if the operation succeeded
+</ResponseField>
+
+<ResponseField name="message" type="string" optional>
+  Error message if operation failed
+</ResponseField>
+
+<Note>
+  Tags are stored as PostgreSQL array type for efficient filtering and querying.
+</Note>
+
+### Delete Resource
+
+**Source:** `admin-resources.ts:67-76`
+
+<ParamField path="id" type="string (uuid)" required>
+  Resource ID to delete
+</ParamField>
+
+```typescript
+export async function deleteResource(id: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("extra_resources").delete().eq("id", id);
+
+  if (error) return { ok: false };
+  
+  revalidatePath("/resources");
+  revalidatePath("/dashboard/resources");
+  return { ok: true };
+}
+```
+
+<Warning>
+  This operation does not automatically delete associated files from storage. Consider implementing cleanup logic if needed.
+</Warning>
+
+## Resource Discovery (Student)
+
+### Get All Resources
+
+**Source:** `resources.ts:5-15`
+
+```typescript
+export async function getExtraResources() {
+  const supabase = createClient();
+  
+  const { data, error } = await supabase
+    .from("extra_resources")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) return [];
+  return data;
+}
+```
+
+<ResponseField name="data" type="array">
+  Array of resource objects ordered by newest first
+</ResponseField>
+
+## Bookmark System
+
+Students can bookmark resources to create their personal library.
+
+### Toggle Bookmark
+
+**Source:** `bookmarks.ts:7-40`
+
+This function handles both adding and removing bookmarks.
+
+<ParamField path="resourceId" type="string (uuid)" required>
+  ID of the resource to bookmark/unbookmark
+</ParamField>
+
+```typescript
+export async function toggleBookmark(resourceId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) return { ok: false, message: "Not authenticated" };
+
+  // Check if bookmark exists
+  const { data: existing } = await supabase
+    .from("resource_bookmarks")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("resource_id", resourceId)
+    .single();
+
+  if (existing) {
+    // Remove bookmark
+    await supabase
+      .from("resource_bookmarks")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("resource_id", resourceId);
+  } else {
+    // Add bookmark
+    await supabase
+      .from("resource_bookmarks")
+      .insert({ user_id: user.id, resource_id: resourceId });
+  }
+
+  revalidatePath("/resources");
+  revalidatePath("/profile");
+  return { ok: true, isBookmarked: !existing };
+}
+```
+
+<ResponseField name="ok" type="boolean">
+  Success indicator
+</ResponseField>
+
+<ResponseField name="isBookmarked" type="boolean">
+  New bookmark state after toggle
+</ResponseField>
+
+<ResponseField name="message" type="string" optional>
+  Error message if user is not authenticated
+</ResponseField>
+
+### Get User Bookmarks
+
+**Source:** `bookmarks.ts:43-61`
+
+Retrieve all resources bookmarked by the current user.
+
+```typescript
+export async function getUserBookmarks() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  // Join with extra_resources table
+  const { data } = await supabase
+    .from("resource_bookmarks")
+    .select(`
+      resource_id,
+      extra_resources (*)
+    `)
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  // Extract resource objects from join
+  return data?.map((item: any) => item.extra_resources) || [];
+}
+```
+
+<ResponseField name="data" type="array">
+  Array of full resource objects, ordered by bookmark date (newest first)
+</ResponseField>
+
+<Note>
+  Bookmarks are user-specific. Each student builds their own personalized library.
+</Note>
+
+## Tag System
+
+### Tag Format
+
+Tags are stored as PostgreSQL arrays and can be used for filtering:
+
+```typescript
+// Input format (comma-separated string)
+const tagsInput = "react, hooks, frontend, tutorial";
+
+// Processing
+const tags = tagsInput.split(",").map(t => t.trim()).filter(t => t.length > 0);
+// Result: ["react", "hooks", "frontend", "tutorial"]
+
+// Storage format (PostgreSQL array)
+// tags: text[]
+```
+
+### Filtering by Tags
+
+You can filter resources using PostgreSQL array operations:
+
+```typescript
+// Example: Get resources with specific tags
+const { data } = await supabase
+  .from("extra_resources")
+  .select("*")
+  .contains("tags", ["react"])  // Contains 'react' tag
+  .order("created_at", { ascending: false });
+```
+
+## Storage Organization
+
+Resource files are stored in the `materials` bucket:
+
+```
+materials/
+├── {timestamp}_{filename}.pdf
+├── {timestamp}_{filename}.zip
+├── {timestamp}_{filename}.pptx
+└── ...
+```
+
+**Naming Convention:**
+- Bucket: `materials`
+- Filename: `{timestamp}_{sanitized_original_name}`
+- Spaces replaced with underscores
+- Example: `1709567890123_React_Hooks_Guide.pdf`
+
+## Database Schema
+
+### Extra Resources Table
+```sql
+extra_resources {
+  id: uuid (PK)
+  title: text
+  description: text
+  category: text
+  tags: text[]  -- PostgreSQL array
+  external_url: text
+  file_url: text
+  created_at: timestamp
+}
+```
+
+### Resource Bookmarks Table
+```sql
+resource_bookmarks {
+  id: uuid (PK)
+  user_id: uuid (FK -> profiles.id)
+  resource_id: uuid (FK -> extra_resources.id)
+  created_at: timestamp
+  
+  UNIQUE(user_id, resource_id)  -- Prevent duplicate bookmarks
+}
+```
+
+## Cache Strategy
+
+The system revalidates multiple paths to keep data synchronized:
+
+```typescript
+// After any resource mutation
+revalidatePath("/resources");           // Public resource page
+revalidatePath("/dashboard/resources"); // Admin management page
+revalidatePath("/profile");             // User's bookmark collection
+```
+
+## Filter Strategies
+
+<Tabs>
+  <Tab title="By Category">
+    ```typescript
+    const { data } = await supabase
+      .from("extra_resources")
+      .select("*")
+      .eq("category", "Tutorial")
+      .order("created_at", { ascending: false });
+    ```
+  </Tab>
+  
+  <Tab title="By Tag">
+    ```typescript
+    const { data } = await supabase
+      .from("extra_resources")
+      .select("*")
+      .contains("tags", ["react", "typescript"])
+      .order("created_at", { ascending: false });
+    ```
+  </Tab>
+  
+  <Tab title="By Search Term">
+    ```typescript
+    const { data } = await supabase
+      .from("extra_resources")
+      .select("*")
+      .or(`title.ilike.%${term}%,description.ilike.%${term}%`)
+      .order("created_at", { ascending: false });
+    ```
+  </Tab>
+  
+  <Tab title="User's Bookmarks">
+    ```typescript
+    const bookmarks = await getUserBookmarks();
+    // Already filtered by user_id
+    ```
+  </Tab>
+</Tabs>
+
+## Resource Types
+
+<CardGroup cols={2}>
+  <Card title="File-based Resources" icon="file-pdf">
+    **Characteristics:**
+    - `file_url` is set
+    - Stored in Supabase Storage
+    - Requires signed URLs for download
+    - Can be PDFs, slides, code archives, etc.
+  </Card>
+  
+  <Card title="Link-based Resources" icon="link">
+    **Characteristics:**
+    - `external_url` is set
+    - Points to external content
+    - GitHub repos, documentation sites, videos
+    - No storage overhead
+  </Card>
+  
+  <Card title="Hybrid Resources" icon="layer-group">
+    **Characteristics:**
+    - Both `file_url` and `external_url` set
+    - Local file + external reference
+    - Example: Slides + video recording
+  </Card>
+  
+  <Card title="Text-only Resources" icon="text">
+    **Characteristics:**
+    - Only title and description
+    - No files or links
+    - Pure informational content
+  </Card>
+</CardGroup>
+
+## Usage Examples
+
+### Admin: Create Resource
+
+```tsx
+import { saveResource } from '@/core/actions/admin-resources';
+
+const handleCreateResource = async () => {
+  const formData = new FormData();
+  formData.set('title', 'React Hooks Complete Guide');
+  formData.set('description', 'Comprehensive guide to React Hooks');
+  formData.set('category', 'Tutorial');
+  formData.set('tags', 'react, hooks, frontend, javascript');
+  formData.set('external_url', 'https://github.com/example/react-hooks');
+  formData.set('file', pdfFile); // Optional file
+  
+  const result = await saveResource(formData);
+  if (result.ok) {
+    console.log('Resource created!');
+  }
+};
+```
+
+### Student: Bookmark Resource
+
+```tsx
+import { toggleBookmark } from '@/core/actions/bookmarks';
+
+const handleBookmark = async (resourceId: string) => {
+  const result = await toggleBookmark(resourceId);
+  if (result.ok) {
+    console.log(result.isBookmarked ? 'Bookmarked!' : 'Removed bookmark');
+  }
+};
+```
+
+### Display User's Library
+
+```tsx
+import { getUserBookmarks } from '@/core/actions/bookmarks';
+
+const MyLibrary = async () => {
+  const bookmarks = await getUserBookmarks();
+  
+  return (
+    <div>
+      <h1>My Saved Resources</h1>
+      {bookmarks.map(resource => (
+        <ResourceCard key={resource.id} resource={resource} />
+      ))}
+    </div>
+  );
+};
+```
+
+## Best Practices
+
+1. **Tag Consistency**: Use lowercase tags for better filtering
+2. **File Naming**: Remove special characters from filenames before upload
+3. **Category Standards**: Define a fixed set of categories for consistency
+4. **Bookmark Limits**: Consider implementing bookmark limits per user if needed
+5. **Storage Cleanup**: Implement periodic cleanup of orphaned files
+6. **Search Optimization**: Add full-text search indexes for large libraries

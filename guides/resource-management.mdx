@@ -1,0 +1,677 @@
+---
+title: 'Resource Management'
+description: 'Guide for managing the resource library in the DIDG platform'
+icon: 'folder-open'
+---
+
+## Overview
+
+The DIDG resource library (`/resources`) provides a centralized collection of learning materials separate from ayudantías. Resources include:
+- Code snippets and templates
+- Tutorials and guides
+- External tool links
+- Reference documentation
+
+This guide covers managing resources from the admin perspective.
+
+## Resource Management Interface
+
+### Accessing the Resources Page
+
+<Steps>
+  <Step title="Navigate to Resources">
+    From the admin sidebar, click "Recursos" or go to `/dashboard/resources`.
+  </Step>
+  
+  <Step title="View the Interface">
+    The page displays:
+    - Header: "Gestión de Recursos" with a sparkle icon
+    - Toolbar: Search bar, category filters, and "Nuevo" button
+    - Resource list: All existing resources in a grid/table format
+  </Step>
+</Steps>
+
+**Component Structure:**
+- Main component: `AdminResourceList` (client-side for interactivity)
+- Data source: `extra_resources` table
+- Modal component: `ResourceFormModal` (for create/edit)
+
+## Creating Resources
+
+### Opening the Creation Form
+
+<Steps>
+  <Step title="Click 'Nuevo' Button">
+    In the top-right of the toolbar, click the "Nuevo" button (plus icon).
+  </Step>
+  
+  <Step title="Modal Opens">
+    The `ResourceFormModal` appears with an empty form.
+  </Step>
+</Steps>
+
+### Filling Out the Resource Form
+
+The form includes the following fields:
+
+**Required Fields:**
+
+1. **Title**
+   - Short, descriptive name for the resource
+   - Example: "React Hooks Cheat Sheet", "Git Commands Guide"
+
+2. **Category**
+   - Dropdown options: `CODE`, `TUTORIAL`, `TOOL`
+   - **CODE**: Code snippets, templates, boilerplate
+   - **TUTORIAL**: Step-by-step guides, how-tos
+   - **TOOL**: External tools, apps, libraries
+
+3. **Resource Type** (choose one):
+   - **File Upload**: For PDFs, code archives, images
+   - **External Link**: For URLs to documentation, tools, videos
+
+**Optional Fields:**
+
+4. **Tags**
+   - Comma-separated keywords
+   - Example: `react, hooks, javascript`
+   - Used for search and organization
+
+5. **Description**
+   - Longer text explaining the resource
+   - Supports Markdown formatting
+
+<Steps>
+  <Step title="Enter Basic Information">
+    Fill in the title and select a category from the dropdown.
+  </Step>
+  
+  <Step title="Choose Resource Type">
+    Decide whether to upload a file or link to an external URL:
+    - For file uploads: Click the file input and select a file
+    - For external links: Paste the full URL (e.g., `https://reactjs.org/docs`)
+  </Step>
+  
+  <Step title="Add Tags">
+    Enter relevant keywords separated by commas. This helps with filtering and search.
+  </Step>
+  
+  <Step title="Write Description (Optional)">
+    Provide context about the resource. Use Markdown for formatting:
+    ```markdown
+    ## Overview
+    This cheat sheet covers all React Hooks with examples.
+    
+    **Includes:**
+    - useState
+    - useEffect
+    - Custom hooks
+    ```
+  </Step>
+  
+  <Step title="Submit">
+    Click "Crear" or "Guardar". The form:
+    - Uploads the file to Supabase Storage (if applicable)
+    - Inserts a record into `extra_resources` table with:
+      - `title`, `category`, `tags` (array)
+      - `file_url` (if file uploaded) or `link_url` (if external)
+    - Closes the modal
+    - Refreshes the resource list
+  </Step>
+</Steps>
+
+<Note>
+  Tags are stored as a PostgreSQL array (`text[]`), enabling efficient querying and filtering.
+</Note>
+
+## Editing Resources
+
+### Opening the Edit Form
+
+<Steps>
+  <Step title="Locate the Resource">
+    On `/dashboard/resources`, find the resource in the list.
+  </Step>
+  
+  <Step title="Hover to Reveal Actions">
+    Hover over the resource card. Edit and delete buttons appear with a fade-in effect.
+  </Step>
+  
+  <Step title="Click Edit Icon">
+    Click the `Edit2` icon (pencil). The `ResourceFormModal` opens with pre-populated data.
+  </Step>
+</Steps>
+
+### Making Changes
+
+<Steps>
+  <Step title="Update Fields">
+    Modify any field:
+    - Change title or category
+    - Add/remove tags
+    - Update description
+    - Replace file or link
+  </Step>
+  
+  <Step title="Save Changes">
+    Click "Guardar". The `updateResource` action:
+    - Updates the database record
+    - Replaces the file in storage if a new one was uploaded
+    - Refreshes the resource list
+  </Step>
+</Steps>
+
+<Tip>
+  If you're only updating metadata (title, tags), you don't need to re-upload the file. The existing file remains linked.
+</Tip>
+
+## Deleting Resources
+
+<Steps>
+  <Step title="Locate the Resource">
+    Find the resource you want to delete in the list.
+  </Step>
+  
+  <Step title="Click Delete Icon">
+    Hover over the card and click the `Trash2` icon (trash can).
+  </Step>
+  
+  <Step title="Confirm Deletion">
+    A browser confirmation dialog appears: "¿Estás seguro de eliminar este recurso?"
+  </Step>
+  
+  <Step title="Deletion Executed">
+    The `deleteResource` action:
+    - Removes the database record
+    - Deletes the associated file from Supabase Storage (if configured)
+    - Refreshes the list
+  </Step>
+</Steps>
+
+<Note>
+  Deletion is permanent. Ensure you have backups of critical resources before deleting.
+</Note>
+
+## Organizing Resources
+
+### Using Categories
+
+Categories provide high-level organization:
+
+**Category Definitions:**
+
+- **CODE**: Source code, snippets, templates, boilerplate projects
+  - Examples: "React Component Template", "SQL Query Examples"
+  - Icon: `FileText` (green color)
+
+- **TUTORIAL**: Guides, how-tos, step-by-step instructions
+  - Examples: "Docker Setup Guide", "Git Workflow Tutorial"
+  - Icon: `LinkIcon` (blue color)
+
+- **TOOL**: External tools, libraries, software recommendations
+  - Examples: "Postman API Tool", "VS Code Extensions List"
+  - Icon: `LinkIcon` (blue color)
+
+<Tip>
+  Use consistent categories to make filtering predictable for students.
+</Tip>
+
+### Tagging Best Practices
+
+**Tag Guidelines:**
+
+1. **Use Lowercase**: Consistent casing improves search (`react` not `React`)
+2. **Be Specific**: Include technology names, topics, difficulty levels
+3. **Multiple Tags**: Add 3-5 relevant tags per resource
+4. **Common Tags**: Establish a standard tag vocabulary (e.g., `beginner`, `advanced`, `web`, `database`)
+
+**Example Tag Sets:**
+
+- Code snippet: `javascript, async, promises, beginner`
+- Tutorial: `docker, containers, deployment, intermediate`
+- Tool: `vscode, extensions, productivity, development`
+
+<Tip>
+  Review existing resources to see common tags before creating new ones. This ensures consistency across the library.
+</Tip>
+
+### Organizing by Subject
+
+While resources are global (not tied to specific subjects), you can organize them implicitly:
+
+1. **Subject-Specific Tags**: Use subject codes as tags (e.g., `inf-239`, `database`)
+2. **Descriptions**: Mention the subject in the description: "Useful for INF-280 students"
+3. **Linking**: Reference resources in ayudantía descriptions
+
+<Accordion title="Should I duplicate resources per subject?">
+  No. Resources are shared across all subjects. If a resource applies to multiple courses, use tags to indicate relevance:
+  
+  **Example:**
+  - Title: "SQL Best Practices"
+  - Tags: `sql, database, inf-239, inf-340`
+  - Description: "Relevant for Database (INF-239) and Advanced DB (INF-340)"
+  
+  Students can filter by tag to find resources for their subjects.
+</Accordion>
+
+## Managing Permissions
+
+### Current Permission Model
+
+**Student Access:**
+- Students can view and download all resources on `/resources`
+- Bookmark resources (if logged in)
+- Cannot create, edit, or delete
+
+**Admin Access:**
+- Full CRUD (Create, Read, Update, Delete) via `/dashboard/resources`
+- Access to `AdminResourceList` component
+- Upload files to Supabase Storage
+
+<Note>
+  Permissions are enforced via:
+  - Route protection (dashboard routes require admin role)
+  - Row-Level Security (RLS) in Supabase (if configured)
+  - Server actions check user role before mutations
+</Note>
+
+### Future: Restricted Resources
+
+If you need resources visible only to specific subjects or student groups:
+
+1. **Add Visibility Field**
+   - Modify `extra_resources` table to include `visibility` (e.g., `public`, `enrolled_only`)
+   - Add `subject_id` foreign key for subject-specific resources
+
+2. **Update Queries**
+   - Filter resources based on user enrollment
+   - Display public resources to all, restricted resources to enrolled students
+
+3. **UI Changes**
+   - Add visibility toggle in `ResourceFormModal`
+   - Show visibility badge on resource cards
+
+## Tracking Downloads and Analytics
+
+### Download Tracking
+
+Resource downloads can be tracked for analytics:
+
+**Implementation:**
+
+1. **Create Downloads Table**
+   ```sql
+   CREATE TABLE resource_downloads (
+     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+     resource_id UUID REFERENCES extra_resources(id),
+     user_id UUID REFERENCES profiles(id),
+     downloaded_at TIMESTAMP DEFAULT NOW()
+   );
+   ```
+
+2. **Log Downloads**
+   - When a student clicks a download link, insert a record
+   - Use server action or API route to log the event
+
+3. **Display Analytics**
+   - Similar to `AnalyticsChart` for ayudantías
+   - Show most downloaded resources
+   - Track download trends over time
+
+<Tip>
+  Analytics help you identify which resources are most valuable and which might need updating or removal.
+</Tip>
+
+### Viewing Resource Analytics
+
+*(If analytics are implemented)*
+
+<Steps>
+  <Step title="Navigate to Dashboard">
+    Go to `/dashboard` (main dashboard page).
+  </Step>
+  
+  <Step title="View Resource Download Chart">
+    Look for a section showing:
+    - Top 10 downloaded resources
+    - Downloads per category
+    - Recent download activity
+  </Step>
+  
+  <Step title="Interpret Data">
+    Use analytics to:
+    - Identify popular content to expand
+    - Remove rarely accessed resources
+    - Update outdated materials based on usage patterns
+  </Step>
+</Steps>
+
+## Search and Filter Interface
+
+### Using the Search Bar
+
+The `AdminResourceList` component includes a search feature:
+
+<Steps>
+  <Step title="Locate Search Bar">
+    At the top of `/dashboard/resources`, find the search input with a magnifying glass icon.
+  </Step>
+  
+  <Step title="Enter Keywords">
+    Type keywords from the title or tags. Search filters in real-time as you type.
+  </Step>
+  
+  <Step title="Review Results">
+    The resource list updates instantly to show matching items.
+  </Step>
+</Steps>
+
+**Search Logic:**
+- Searches in `title` field (case-insensitive)
+- Searches in `tags` array (matches any tag containing the keyword)
+
+<Tip>
+  Use specific keywords (e.g., "docker", "react") for faster results. Broad terms (e.g., "code") return many results.
+</Tip>
+
+### Filtering by Category
+
+Category filters provide quick access to specific resource types:
+
+<Steps>
+  <Step title="Locate Filter Buttons">
+    Below the search bar, find four buttons: "Todos", "CODE", "TUTORIAL", "TOOL".
+  </Step>
+  
+  <Step title="Click a Category">
+    Select a category button. The list filters to show only resources in that category.
+  </Step>
+  
+  <Step title="Clear Filter">
+    Click "Todos" to show all resources again.
+  </Step>
+</Steps>
+
+**Filter UI States:**
+- **Active filter**: Primary color background, border, and text
+- **Inactive filter**: Muted colors, hover effect on mouseover
+
+### Combining Search and Filters
+
+You can use search and category filters simultaneously:
+
+**Example:**
+1. Click "CODE" to show only code resources
+2. Type "react" in the search bar
+3. Result: Only code resources with "react" in the title or tags
+
+<Tip>
+  This is useful when managing a large library. For example, find all tutorials about databases by filtering "TUTORIAL" and searching "database".
+</Tip>
+
+## Resource Card Display
+
+### Card Layout
+
+Each resource in the list displays:
+
+**Left Section:**
+- **Icon**: 
+  - Green `FileText` icon for uploaded files
+  - Blue `LinkIcon` for external links
+- **Title**: Resource name (bold, clickable)
+- **Category Badge**: Small label with category (e.g., "CODE")
+- **Tags**: Hashtag-prefixed keywords (e.g., `#react #hooks`)
+
+**Right Section (Hover):**
+- **Edit Button**: Pencil icon (opens edit modal)
+- **Delete Button**: Trash icon (deletes resource)
+
+<Note>
+  Hover effects are implemented with opacity transitions. Buttons fade in when you hover over the card.
+</Note>
+
+## File Management
+
+### Uploading Files
+
+When you upload a file in the resource form:
+
+<Steps>
+  <Step title="Select File">
+    Click the file input in `ResourceFormModal`.
+  </Step>
+  
+  <Step title="File Upload Process">
+    Upon form submission:
+    - File is uploaded to Supabase Storage (bucket: `extra-resources` or similar)
+    - Public URL is generated
+    - URL is stored in `extra_resources.file_url`
+  </Step>
+  
+  <Step title="Verify Upload">
+    After creation, the resource card shows a file icon and the title links to the file.
+  </Step>
+</Steps>
+
+**Supported File Types:**
+- PDFs (documentation, guides)
+- ZIP files (code archives, project templates)
+- Images (diagrams, infographics)
+
+<Tip>
+  Compress large files before uploading to reduce storage costs and improve download speeds.
+</Tip>
+
+### Replacing Files
+
+To replace an existing file:
+
+<Steps>
+  <Step title="Edit Resource">
+    Click the edit icon on the resource card.
+  </Step>
+  
+  <Step title="Upload New File">
+    In the file input, select a replacement file.
+  </Step>
+  
+  <Step title="Save Changes">
+    Submit the form. The old file is deleted from storage (if configured) and the new file is uploaded.
+  </Step>
+</Steps>
+
+<Note>
+  Ensure your storage bucket has delete permissions enabled for admins to avoid orphaned files.
+</Note>
+
+### External Links
+
+For resources hosted elsewhere:
+
+**Best Practices:**
+
+1. **Use HTTPS**: Ensure links are secure
+2. **Verify Links**: Test URLs before saving to ensure they're accessible
+3. **Link Stability**: Prefer official documentation or permanent URLs (avoid temporary links)
+4. **Description Context**: Explain what the link contains so students know what to expect
+
+**Examples:**
+- MDN Web Docs: `https://developer.mozilla.org/en-US/docs/Web/JavaScript`
+- GitHub Repo: `https://github.com/username/project`
+- Video Tutorial: `https://youtube.com/watch?v=...`
+
+## Workflow Examples
+
+### Adding a Code Template Library
+
+<Steps>
+  <Step title="Prepare Files">
+    Create a ZIP file containing code templates (e.g., React components, Node.js boilerplate).
+  </Step>
+  
+  <Step title="Create Resource">
+    Go to `/dashboard/resources`, click "Nuevo".
+  </Step>
+  
+  <Step title="Fill Form">
+    - Title: "React Component Templates"
+    - Category: CODE
+    - Tags: `react, components, templates, boilerplate`
+    - Description: "Reusable React components for common UI patterns"
+    - Upload the ZIP file
+  </Step>
+  
+  <Step title="Save and Share">
+    Submit the form. Students can now download the templates from `/resources`.
+  </Step>
+</Steps>
+
+### Linking to an External Tool
+
+<Steps>
+  <Step title="Identify Tool">
+    Find a useful tool for students (e.g., Postman for API testing).
+  </Step>
+  
+  <Step title="Create Resource">
+    Click "Nuevo" on `/dashboard/resources`.
+  </Step>
+  
+  <Step title="Fill Form">
+    - Title: "Postman - API Testing Tool"
+    - Category: TOOL
+    - Tags: `api, testing, http, development`
+    - Link URL: `https://www.postman.com/`
+    - Description: "Powerful tool for testing REST APIs. Essential for web development projects."
+  </Step>
+  
+  <Step title="Save">
+    Submit. Students see the resource with a link icon and can click to visit the tool's website.
+  </Step>
+</Steps>
+
+### Creating a Tutorial Series
+
+<Steps>
+  <Step title="Write Tutorials">
+    Create a series of guides (e.g., "Git Basics", "Git Branching", "Git Collaboration").
+  </Step>
+  
+  <Step title="Upload Each Tutorial">
+    For each guide:
+    - Create a resource with category TUTORIAL
+    - Use consistent tags (e.g., `git, tutorial, version-control`)
+    - Add part numbers in titles ("Git Tutorial - Part 1: Basics")
+  </Step>
+  
+  <Step title="Cross-Reference">
+    In each tutorial's description, link to the other parts:
+    ```markdown
+    **Part 2 of 3** in the Git Tutorial Series.
+    - [Part 1: Basics](#)
+    - [Part 3: Collaboration](#)
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  Use tags to group related resources. Students can filter by tag to find all parts of a series.
+</Tip>
+
+## Best Practices
+
+<Tip>
+  **Quality Over Quantity**: Curate resources carefully. A small library of high-quality materials is better than a large library of outdated or redundant content.
+</Tip>
+
+<Tip>
+  **Regular Audits**: Review the resource library each semester to remove outdated links and update materials.
+</Tip>
+
+<Tip>
+  **Student Feedback**: Use the contact form or surveys to ask students which resources they find most helpful.
+</Tip>
+
+<Tip>
+  **Version Control**: For code templates, include version numbers in titles or descriptions (e.g., "React 18 Hooks Guide").
+</Tip>
+
+<Tip>
+  **Accessibility**: Ensure PDFs are searchable (OCR if scanned) and links are HTTPS for security.
+</Tip>
+
+## Troubleshooting
+
+<Accordion title="File upload fails">
+  **Possible Causes:**
+  - File exceeds storage bucket size limit
+  - Invalid file type
+  - Network timeout
+  
+  **Solution:**
+  - Check Supabase Storage settings for max file size
+  - Compress large files or split into smaller archives
+  - Retry with stable internet connection
+</Accordion>
+
+<Accordion title="External links not working">
+  **Possible Causes:**
+  - URL typo
+  - Link changed or site moved
+  - HTTPS/HTTP mismatch
+  
+  **Solution:**
+  - Verify URL in browser before saving
+  - Use official, permanent URLs
+  - Update link if site has moved
+</Accordion>
+
+<Accordion title="Search not finding resources">
+  **Possible Causes:**
+  - Keyword mismatch (searching for a word not in title or tags)
+  - Case sensitivity issue (unlikely, but check implementation)
+  
+  **Solution:**
+  - Add more tags to resources
+  - Use broader search terms
+  - Check spelling
+</Accordion>
+
+<Accordion title="Can't delete a resource">
+  **Possible Causes:**
+  - Database permissions issue
+  - Foreign key constraint (if bookmarks reference the resource)
+  
+  **Solution:**
+  - Check admin permissions in Supabase
+  - Remove bookmarks referencing the resource first (or configure cascade delete)
+</Accordion>
+
+## Advanced: Extending the Resource System
+
+If you want to enhance the resource management system:
+
+1. **Add Resource Collections**
+   - Group resources into collections (e.g., "Web Dev Fundamentals")
+   - Create a `collections` table and many-to-many relationship
+
+2. **Implement Versioning**
+   - Track resource versions in a separate table
+   - Allow students to access previous versions
+
+3. **Add User Ratings**
+   - Let students rate resources (1-5 stars)
+   - Display average rating on resource cards
+
+4. **Automate Link Checking**
+   - Schedule a cron job to verify external links
+   - Flag broken links for admin review
+
+5. **Bulk Upload**
+   - Create a CSV import feature for adding multiple resources at once
+   - Useful for migrating from other systems
+
+<Note>
+  Before implementing advanced features, ensure the core system is stable and meets current needs. Prioritize features based on user feedback.
+</Note>
