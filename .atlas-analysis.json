@@ -1,0 +1,115 @@
+{
+  "projectType": "saas",
+  "projectName": "DIDG System",
+  "projectDescription": "Academic management platform for engineering students with teaching assistant resources, grade tracking, and interactive tools.",
+  "theme": "aspen",
+  "primaryColor": "#040404",
+  "lightColor": null,
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/authentication",
+              "features/academic-management",
+              "features/resource-library",
+              "features/tools"
+            ]
+          },
+          {
+            "group": "User Guides",
+            "pages": [
+              "guides/student-guide",
+              "guides/admin-guide",
+              "guides/course-management",
+              "guides/resource-management"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/tech-stack",
+              "architecture/database-schema",
+              "architecture/security"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Developer Reference",
+        "groups": [
+          {
+            "group": "Setup",
+            "pages": [
+              "development/environment-setup",
+              "development/configuration",
+              "development/running-locally"
+            ]
+          },
+          {
+            "group": "Server Actions",
+            "pages": [
+              "api/authentication",
+              "api/academic",
+              "api/resources",
+              "api/bookmarks",
+              "api/analytics"
+            ]
+          },
+          {
+            "group": "Components",
+            "pages": [
+              "components/dashboard",
+              "components/courses",
+              "components/ui"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/overview",
+              "deployment/environment-variables",
+              "deployment/supabase-setup"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Supabase Authentication with 2FA via Telegram",
+    "Academic Resource Library with Filtering and Bookmarks",
+    "Teaching Assistant Timeline and Session Management",
+    "Grade Simulator Tool with Local Persistence",
+    "Admin Dashboard for Course and Student Management",
+    "Real-time Notifications via Telegram Bot",
+    "Role-Based Access Control (Admin/Student)",
+    "Interactive Terminal with Command Palette (Ctrl+K)"
+  ],
+  "publicApiSurface": [
+    "initiateLogin",
+    "completeLogin",
+    "getAyudantias",
+    "createAyudantia",
+    "getResources",
+    "createResource",
+    "toggleBookmark",
+    "getStudentProgress",
+    "uploadGrades",
+    "submitFeedback",
+    "getAnalytics"
+  ]
+}
